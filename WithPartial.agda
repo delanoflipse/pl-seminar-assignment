@@ -1,56 +1,59 @@
-open import Agda.Primitive
-open import Agda.Builtin.Bool
-open import Agda.Builtin.Nat
-open import Agda.Builtin.Equality
+{-# OPTIONS --copatterns --sized-types #-}
 
-open import Category.Monad public
+open import Size
+open import Agda.Primitive
+open import Data.Bool
+open import Data.Nat
+
+open import Relation.Binary.PropositionalEquality
+open import Effect.Monad
 
 module WithPartial where
   
 Type = Set
 
 data Expr : Type where
-  Val : Nat → Expr
+  Val : ℕ → Expr
   Add : Expr → Expr → Expr
   Loop : Expr
 
-data Partial (A : Type) : Type where
-  Now : A → Partial A
-  Later : Partial A → Partial A
+mutual
+  data Partial (A : Type) (i : Size) : Type where
+    now   : A → Partial A i
+    later : ∞Partial A i → Partial A i
 
--- Partial-Monad : Monad Partial
--- Partial-Monad = makeMonad pure bind r1 r2 r3
---   where
---     pure : {A : Type} → A → Partial A
---     pure = Now
-    
---     bind : ∀ {A B} → Partial A → (A → Partial B) → Partial B
---     bind (Now x) f = f x
---     bind (Later p) f = Later (bind p f)
+  record ∞Partial (A : Type) (i : Size) : Type where
+    coinductive
+    constructor delay
+    field
+      force : {j : Size< i} → Partial A j
 
---     r1 : ∀ {A B} → (x : A) → (f : A → Partial B) → bind (pure x) f ≡ f x
---     r1 = {!!}
 
---     r2 : ∀ {A} → (m : Partial A) → bind m pure ≡ m
---     r2 = {!!}
+module PartialBind where
+  mutual
+    _>>=_ : ∀ {i A B} → Partial A i → (A → Partial B i) → Partial B i
+    now   x >>= f = f x
+    later x >>= f = later (x ∞>>= f)
 
---     r3 : ∀ {A B C} → (m : Partial A) → (f : A → Partial B) → (g : B → Partial C) → bind (bind m f) g ≡ bind m (λ x → bind (f x) g)
---     r3 = {!!}
+    _∞>>=_ :  ∀ {i A B} → ∞Partial A i → (A → Partial B i) → ∞Partial B i
+    force (x ∞>>= f) = force x >>= F
 
-Partial-Monad : RawMonad Partial
-Partial-Monad = makeRawMonad pure bind
-  where
-    pure : {A : Type} → A → Partial A
-    pure = Now
-    
-    bind : ∀ {A B} → Partial A → (A → Partial B) → Partial B
-    bind (Now x) f = f x
-    bind (Later p) f = Later (bind p f)
-  
-eval : Expr → Partial Nat
+delayMonad : ∀ {i} → RawMonad {f = lzero} (λ A → Partial A i)
+delayMonad {i} = record
+  { return = now
+  ; _>>=_  = _>>=_ {i}
+  } where open PartialBind
+
+module _ {i : Size} where
+  open module PartialMonad = RawMonad (delayMonad {i = i}) 
+                           public renaming (_⊛_ to _<*>_)
+
+eval : Expr → Partial ℕ
 eval (Val n) = Now n
 eval (Add e1 e2) = do
   n1 ← eval e1
   n2 ← eval e2
   Now (n1 + n2)
 eval Loop = Later (eval Loop)
+
+-- exec : Code → Stack → Partial Stack

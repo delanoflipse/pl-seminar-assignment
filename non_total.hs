@@ -18,6 +18,13 @@ type Stack = [Int]
 exec :: Code -> Stack  -> Stack
 
 -- We want to show the following property:
-exec c (eval e : s) = exec (comp e c) s
+-- exec c (eval e : s) = exec (comp e c) s
 -- As in: Executing a program on the stack which contains the result of evaulating an expression
 --        is the same as compiling the expression (with the program as its continuation) and executing the compiled code on the stack
+
+
+data Code = PUSH Int Code | ADD Int Code
+comp (Val n) c = PUSH n c
+exec (PUSH n c) s = exec c (n : s)
+
+comp (Add x y) c = comp x (comp y (ADD c))
