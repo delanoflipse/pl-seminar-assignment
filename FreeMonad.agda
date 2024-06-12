@@ -21,17 +21,4 @@ PartialSig = record
   }
 
 
--- Functor instance for the container
--- instance
---   fmap : Functor {I = Shape} {Pos = Position}
---   fmap {A} {B} f = λ { (later , pos) -> (later , f pos) }
-
--- -- Define the partial functor using the container
--- partialF : Functor (Container.toFunctor PartialSig)
--- partialF = Container.toFunctor PartialSig
-
--- -- Example usage: defining a simple value
--- example : GuardedFix partialF
--- example = unfoldG (λ _ -> later , tt)
-
 -- partialFree : PartialF ⋆
