@@ -4,6 +4,7 @@ open import Data.Product
 open import Agda.Builtin.Unit
 open import Data.Empty
 open import Data.Bool
+open import Relation.Binary.PropositionalEquality
 
 open import Effect
 open import Free
@@ -15,37 +16,42 @@ open import Free
 
 module FreeND where
 
-data ND_Op : Set where
-  ZeroOp    : ND_Op
-  ChoiceOp  : ND_Op
+data NDOp : Set where
+  ZeroOp    : NDOp
+  ChoiceOp  : NDOp
 
-ND_Ret : ND_Op → Set
-ND_Ret ZeroOp = ⊥
-ND_Ret ChoiceOp = Bool
+NDRet : NDOp → Set
+NDRet ZeroOp = ⊥
+NDRet ChoiceOp = Bool
 
-ND_Effect : Effect
-ND_Effect = ND_Op ▷ ND_Ret
+NDEffect : Effect
+NDEffect = NDOp ▷ NDRet
 
-ND_Free = Free ND_Effect
+NDFree = Free NDEffect
 
-ret : ∀ {A} → A → ND_Free A
+ret : ∀ {A} → A → NDFree A
 ret A = pure A
 
-zero : ∀ {A} → ND_Free A
+zero : ∀ {A} → NDFree A
 zero = impure (ZeroOp , λ ())
 
-infixl 8 _⊕_
+infix 8 _⊕_
 
-_⊕_ : ∀ {A} → ND_Free A → ND_Free A → ND_Free A
+_⊕_ : ∀ {A} → NDFree A → NDFree A → NDFree A
 op₁ ⊕ op₂ = impure (ChoiceOp , λ b → if b then op₁ else op₂)
 
--- ND_Ret : ND_Op → Set
--- ND_Ret zero = ⊥
--- ND_Ret (choice op₁ op₂) = ND_Ret op₁ × ND_Ret op₂
+-- NDRet : NDOp → Set
+-- NDRet zero = ⊥
+-- NDRet (choice op₁ op₂) = NDRet op₁ × NDRet op₂
 
--- zeroF : ∀ {A} → ND_Free A
+-- zeroF : ∀ {A} → NDFree A
 -- zeroF = impure (inj zero , ⊥-elim)
 
--- _[+]_ : ∀ {A} → ND_Free A → ND_Free A → ND_Free A
+-- _[+]_ : ∀ {A} → NDFree A → NDFree A → NDFree A
 -- op₁ [+] op₂ = impure (choice op₁ op₂ , _)
 
+
+⊕-inj : ∀ {A} {p q p′ q′ : Free NDEffect A}
+      → p ⊕ q ≡ p′ ⊕ q′ → (p ≡ p′) × (q ≡ q′)
+⊕-inj x with f-inj (impure-inj x)
+... | q = (q true) , (q false)

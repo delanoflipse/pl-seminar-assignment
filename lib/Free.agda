@@ -7,6 +7,7 @@ open import Agda.Builtin.Unit
 open import Agda.Primitive
 open import Category.Monad
 open import Function.Base
+open import Relation.Binary.PropositionalEquality
 
 open import Effect
 
@@ -32,3 +33,13 @@ mkFreeMonad = record
   { return = pure
   ; _>>=_ = _>>=_
   }
+
+impure-inj : ∀ {A : Set} {C : Effect} {o} {k k′ : Effect.Ret C o → Free C A}
+           → impure (o , k) ≡ impure (o , k′)
+           → k ≡ k′
+impure-inj refl = refl
+
+f-inj : ∀ {A B : Set} {f f′ : A → B}
+      → f ≡ f′
+      → ∀ b → f b ≡ f′ b
+f-inj refl _ = refl

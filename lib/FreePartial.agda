@@ -8,6 +8,7 @@ open import Effect
 open import Free
 -- open import FreeCo
 
+module FreePartial where
 -- data Partial (A : Set) : Set where
 --   Now : A → Partial A
 --   Later : Partial A -> Partial A

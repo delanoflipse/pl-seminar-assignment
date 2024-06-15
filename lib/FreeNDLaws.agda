@@ -1,16 +1,34 @@
 open import Function
+open import Relation.Binary.PropositionalEquality
+open import Data.Bool
+open import Data.Product
 
 open import Free
 open import FreeND
 
-ND = ND_Free
+ND = NDFree
 
+infixr 6 _~⟨_⟩_
+infixr 6 _~⟨⟩_
+infix 6 _~_
+infix 7 _∎
 infix 5 _⇓_
 
-data _⇓_ {A : Set} : ND A → A → Set where
-  conv-ret : (x : A) → ret x ⇓ x
-  conv-l : ∀{p} {x} → p ⇓ x → (q : ND A) → p ⊕ q ⇓ x
-  conv-r : ∀{q} {x} → (p : ND A) → q ⇓ x → p ⊕ q ⇓ x
+-- convergence rules for ND
+data _⇓_ {A : Set} (p : ND A) (x : A) : Set where
+  -- ret x converges to x
+  conv-ret : p ≡ ret x → p ⇓ x
+  -- p ⊕ q converges to v if p converges to v
+  conv-l : ∀ {p'} → p' ⇓ x → (q : ND A) → p ≡ (p' ⊕ q) → p ⇓ x
+  -- p ⊕ q converges to v if q converges to v
+  conv-r : ∀ {q} → (p' : ND A) → q ⇓ x → p ≡ (p' ⊕ q) → p ⇓ x
+
+-- data _⇓_ {A : Set} : ND A → A → Set where
+--   conv-ret : (x : A) → ret x ⇓ x
+--   conv-l : ∀{p} {x} → p ⇓ x → (q : ND A) → p ⊕ q ⇓ x
+--   conv-r : ∀{q} {x} → (p : ND A) → q ⇓ x → p ⊕ q ⇓ x
+
+-- p and q are bisimilar if they converge to the same value for all possible values
 
 record _~_  {A : Set} (p q : ND A) : Set where
   constructor mk~
@@ -29,21 +47,28 @@ open _~_ public
 ~trans eq eq' = mk~ ( λ c → ~conv-l eq' (~conv-l eq c))
                     ( λ c → ~conv-r eq (~conv-r eq' c))
 
-
 ~symm : ∀ {A} {a b : ND A}
   (eq : a ~ b) → b ~ a
 ~symm eq = mk~ (~conv-r eq) (~conv-l eq)
 
-
+-- if p converges to v implies that p' converges to v
+-- and the same for q and q'
+-- then p ⊕ q converges to v implies that p' ⊕ q' converges to v
 conv-cong : ∀ {A} {v} {p q p' q' : ND A} →
   (p ⇓ v → p' ⇓ v) → (q ⇓ v → q' ⇓ v) → p ⊕ q ⇓ v → p' ⊕ q' ⇓ v
-conv-cong f g (conv-l c _) =  conv-l (f c) _
-conv-cong f g (conv-r _ c) =  conv-r _ (g c)
+conv-cong f g (conv-l c q x₁) with ⊕-inj x₁
+... | (refl , refl) = conv-l (f c) _ refl
+conv-cong f g (conv-r p' c x₁) with ⊕-inj x₁
+... | (refl , refl) = conv-r _ (g c) refl
+
+-- conv-cong : ∀ {A} {v} {p q p' q' : ND A} →
+--   (p ⇓ v → p' ⇓ v) → (q ⇓ v → q' ⇓ v) → p ⊕ q ⇓ v → p' ⊕ q' ⇓ v
+-- conv-cong f g (conv-l c _) =  conv-l (f c) _
+-- conv-cong f g (conv-r _ c) =  conv-r _ (g c)
 
 plus-cong : ∀ {A} {p q p' q' : ND A} → p ~ p' → q ~ q' → p ⊕ q ~ p' ⊕ q'
 plus-cong eq eq' = mk~ (conv-cong (~conv-l eq) (~conv-l eq'))
                         (conv-cong (~conv-r eq) (~conv-r eq'))
-                  
 
 plus-cong-r : ∀ {A} {p q q' : ND A} → q ~ q' → p ⊕ q ~ p ⊕ q'
 plus-cong-r eq = plus-cong ~refl eq
@@ -58,16 +83,17 @@ _~⟨_⟩_ {_} x r eq =  ~trans r eq
 _~⟨⟩_ : ∀ {A : Set} (x : ND A) → ∀ {y : ND A} → x ~ y → x ~ y
 _~⟨⟩_  x eq = eq
 
-
-
 _∎ : ∀ {A : Set} (x : ND A) → x ~ x
 _∎  x = ~refl
 
 bind-cong-conv : ∀ {A B} {a : ND A} {f : A → ND B} {v : A} {w : B}
-  → (a ⇓ v) → f v ⇓ w → (a >>= f) ⇓ w
+ → (a ⇓ v) → f v ⇓ w → (a >>= f) ⇓ w
 
-bind-cong-conv {a = ret x} (conv-ret .x) d =  d
--- bind-cong-conv {a = pure x} (conv-ret .x) d =  d
+bind-cong-conv {a = pure x} (conv-ret refl) d = d
+bind-cong-conv {a = impure (ChoiceOp , k)} (conv-l c vx x₁) d = {!   !}
+-- bind-cong-conv {a = impure (ChoiceOp , k)} (conv-l c vx x₁) d with ⊕-inj x₁
+-- ... | (r1 , r2) = ?
+bind-cong-conv {a = impure (ChoiceOp , k)} (conv-r _ c x₁) d = {!   !}
 
 -- bind-cong-conv {a = a1 ⊕ a2} (conv-l c .a2) d = conv-l (bind-cong-conv c d) _
 -- bind-cong-conv {a = a1 ⊕ a2} (conv-r .a1 c) d = conv-r _ (bind-cong-conv c d)
@@ -354,4 +380,4 @@ bind-cong-conv {a = ret x} (conv-ret .x) d =  d
 -- pos-getJust : ∀ {A B} (p : ND B) {f : A → ND B} (m : Maybe A) → ∃[ v ] p ⇓ v → (∀ w → ∃[ v ] f w ⇓ v) → ∃[ v ] (getJust p f m) ⇓ v
 -- pos-getJust p nothing c f = c
 -- pos-getJust p (just x) c f = f x
-  
+   
