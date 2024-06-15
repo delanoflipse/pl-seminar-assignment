@@ -95,6 +95,7 @@ bind-cong-conv {a = impure (ChoiceOp , k)} (conv-l c vx x₁) d = {!   !}
 -- ... | (r1 , r2) = ?
 bind-cong-conv {a = impure (ChoiceOp , k)} (conv-r _ c x₁) d = {!   !}
 
+-- Original:
 -- bind-cong-conv {a = a1 ⊕ a2} (conv-l c .a2) d = conv-l (bind-cong-conv c d) _
 -- bind-cong-conv {a = a1 ⊕ a2} (conv-r .a1 c) d = conv-r _ (bind-cong-conv c d)
 
