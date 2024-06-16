@@ -4,7 +4,10 @@ open import Data.Product
 open import Agda.Builtin.Unit
 open import Data.Empty
 open import Data.Bool
-open import Relation.Binary.PropositionalEquality
+import Relation.Binary.PropositionalEquality as Eq
+open Eq
+open Eq.≡-Reasoning
+open import Axiom.Extensionality.Propositional
 
 open import Effect
 open import Free
@@ -35,6 +38,11 @@ ret A = pure A
 zero : ∀ {A} → NDFree A
 zero = impure (ZeroOp , λ ())
 
+-- zero-is-impure-zero : ∀ {A} {k} (x : NDFree A) → (x ≡ impure (ZeroOp , k)) → x ≡ zero
+-- zero-is-impure-zero (impure (ZeroOp , k)) refl = {!   !} 
+-- zero-is-impure-zero x c with f-inj (impure-inj x)
+-- ... | xx = ?
+
 infix 8 _⊕_
 
 _⊕_ : ∀ {A} → NDFree A → NDFree A → NDFree A
@@ -55,3 +63,4 @@ op₁ ⊕ op₂ = impure (ChoiceOp , λ b → if b then op₁ else op₂)
       → p ⊕ q ≡ p′ ⊕ q′ → (p ≡ p′) × (q ≡ q′)
 ⊕-inj x with f-inj (impure-inj x)
 ... | q = (q true) , (q false)
+ 

@@ -30,7 +30,7 @@ now : ∀ {A} → A → PartialFree A
 now A = pure A
 
 later : ∀ {A} → PartialFree A → PartialFree A
-later pa = impure (LaterOp , λ _ → pa)
+later pa = impure (LaterOp , λ a → {! a !})
 
 example : PartialFree ℕ
 example = later (now 42)

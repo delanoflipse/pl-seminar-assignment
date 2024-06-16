@@ -1,5 +1,6 @@
 open import Function
 open import Relation.Binary.PropositionalEquality
+
 open import Data.Bool
 open import Data.Product
 
@@ -89,13 +90,23 @@ _∎  x = ~refl
 bind-cong-conv : ∀ {A B} {a : ND A} {f : A → ND B} {v : A} {w : B}
  → (a ⇓ v) → f v ⇓ w → (a >>= f) ⇓ w
 
+-- Given a is pure (x: A), the case that a converges to v, and f v converges to w
 bind-cong-conv {a = pure x} (conv-ret refl) d = d
-bind-cong-conv {a = impure (ChoiceOp , k)} (conv-l c vx x₁) d = {!   !}
+
+-- bind-cong-conv {a = pure x} (conv-ret r) d = subst r {!   !}
+
+bind-cong-conv {a = impure (ChoiceOp, k)} (conv-l c q refl) d = {!   !}
+bind-cong-conv (conv-r p' c x) d = {!   !}
+-- bind-cong-conv {a = pure x} (conv-ret refl) d = {!   !}
+-- bind-cong-conv {a = impure (ChoiceOp , k)} d = {!   !}
+-- bind-cong-conv {a = impure (ChoiceOp , k)} (conv-l c _ x₁) d with f-inj (impure-inj x₁)
+-- ... | ff = {!   !}
 -- bind-cong-conv {a = impure (ChoiceOp , k)} (conv-l c vx x₁) d with ⊕-inj x₁
 -- ... | (r1 , r2) = ?
-bind-cong-conv {a = impure (ChoiceOp , k)} (conv-r _ c x₁) d = {!   !}
+-- bind-cong-conv {a = impure (ChoiceOp , k)} (conv-r _ c x₁) d = {!   !}
 
 -- Original:
+-- https://agda.readthedocs.io/en/v2.6.1/language/function-definitions.html#dot-patterns
 -- bind-cong-conv {a = a1 ⊕ a2} (conv-l c .a2) d = conv-l (bind-cong-conv c d) _
 -- bind-cong-conv {a = a1 ⊕ a2} (conv-r .a1 c) d = conv-r _ (bind-cong-conv c d)
 
@@ -381,4 +392,4 @@ bind-cong-conv {a = impure (ChoiceOp , k)} (conv-r _ c x₁) d = {!   !}
 -- pos-getJust : ∀ {A B} (p : ND B) {f : A → ND B} (m : Maybe A) → ∃[ v ] p ⇓ v → (∀ w → ∃[ v ] f w ⇓ v) → ∃[ v ] (getJust p f m) ⇓ v
 -- pos-getJust p nothing c f = c
 -- pos-getJust p (just x) c f = f x
-   
+    

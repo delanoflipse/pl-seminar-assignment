@@ -17,6 +17,7 @@ data Free (E : Effect) (A : Set) : Set where
   pure : A → Free E A
   impure : ⟦ E ⟧ (Free E A) → Free E A
 
+-- Monadic operations --
 
 Alg : (E : Effect) (A : Set) → Set
 Alg E A = ⟦ E ⟧ A → A
@@ -27,6 +28,10 @@ fold g a (impure (op , k))  = a (op , fold g a ∘ k)
 
 _>>=_ : ∀ {A B E} → Free E A → (A → Free E B) → Free E B
 m >>= f = fold f impure m
+
+
+fmap : ∀ {E A B} → (A → B) → Free E A → Free E B
+fmap f = fold (pure ∘ f) impure
 
 mkFreeMonad : ∀ {E} → RawMonad (Free E)
 mkFreeMonad = record
