@@ -180,6 +180,7 @@ bind-cong-conv' {a = pure xa} c = xa , conv-ret refl , c
 -- case (a >> f) = (p ⊕ q) >> f, where (p << f) converges to w
 -- However, we instead get the case (a >> f) = p ⊕ q converges to w, where p converges to w.
 bind-cong-conv' {a = impure (ChoiceOp , k)} {f = f} (conv-l {p = p} c q x) = _ , {!   !}
+-- bind-cong-conv' {a = impure (ChoiceOp , k)} {f = f} (conv-l {p = .(_ >>= f)} c .(_ >>= f) x) = _ , {!   !}
 -- bind-cong-conv' {a = impure (ChoiceOp , .(λ x → fold f impure (λ b → if b then (p' >>= f) else ('q >>= f))))} {f = f} (conv-l {p = p} c q x) = _ , {!   !}
 -- bind-cong-conv' {a = impure (ChoiceOp , k)} {f = f} (conv-l {p = p} c q x) = ?
 -- bind-cong-conv' {a = pure x} c = x , ((conv-ret refl) , c)
@@ -189,6 +190,7 @@ bind-cong-conv' {a = impure (ChoiceOp , k)} {f = f} (conv-l {p = p} c q x) = _ ,
 -- bind-cong-conv' {a = impure (ChoiceOp , .(λ _ → if _ then _ else _))} (conv-r .(_ >>= _) c refl) with bind-cong-conv' {a = _} c
 -- ... | v' , d1 , d2 =  v' , conv-r _ _ _ , d2
 
+-- Original:
 -- bind-cong-conv' {a = ret x} c = x , (conv-ret x , c)
 -- bind-cong-conv' {a = a1 ⊕ a2} (conv-l c .(a2 Bind.>>= _)) with bind-cong-conv' {a = a1} c
 -- ... | v' , d1 , d2 = v' , conv-l d1 a2 , d2
