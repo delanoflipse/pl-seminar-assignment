@@ -3,9 +3,10 @@ open import Relation.Binary.PropositionalEquality
 
 open import Data.Bool
 open import Data.Product
-
 open import Free
 open import FreeND
+open import Effect
+open import Level using (Level)
 
 ND = NDFree
 
@@ -16,13 +17,16 @@ infix 7 _∎
 infix 5 _⇓_
 
 -- convergence rules for ND
-data _⇓_ {A : Set} (p : ND A) (x : A) : Set where
+data _⇓_ {A : Set} (nd : ND A) (x : A) : Set where
   -- ret x converges to x
-  conv-ret : p ≡ ret x → p ⇓ x
+  -- Args: a proof that nd ≡ ret x 
+  conv-ret : nd ≡ ret x → nd ⇓ x
   -- p ⊕ q converges to v if p converges to v
-  conv-l : ∀ {p'} → p' ⇓ x → (q : ND A) → p ≡ (p' ⊕ q) → p ⇓ x
+  -- Args: proof p converges to x, q: ND A, proof that nd = p ⊕ q
+  conv-l : ∀ {p} → p ⇓ x → (q : ND A) → nd ≡ (p ⊕ q) → nd ⇓ x
   -- p ⊕ q converges to v if q converges to v
-  conv-r : ∀ {q} → (p' : ND A) → q ⇓ x → p ≡ (p' ⊕ q) → p ⇓ x
+  -- Args: p: ND A, proof q converges to x, proof of that nd = p ⊕ q
+  conv-r : ∀ {q} → (p : ND A) → q ⇓ x → nd ≡ (p ⊕ q) → nd ⇓ x
 
 -- data _⇓_ {A : Set} : ND A → A → Set where
 --   conv-ret : (x : A) → ret x ⇓ x
@@ -30,7 +34,6 @@ data _⇓_ {A : Set} (p : ND A) (x : A) : Set where
 --   conv-r : ∀{q} {x} → (p : ND A) → q ⇓ x → p ⊕ q ⇓ x
 
 -- p and q are bisimilar if they converge to the same value for all possible values
-
 record _~_  {A : Set} (p q : ND A) : Set where
   constructor mk~
   field
@@ -67,6 +70,7 @@ conv-cong f g (conv-r p' c x₁) with ⊕-inj x₁
 -- conv-cong f g (conv-l c _) =  conv-l (f c) _
 -- conv-cong f g (conv-r _ c) =  conv-r _ (g c)
 
+-- if p = p' and q = q' then p ⊕ q = p' ⊕ q'
 plus-cong : ∀ {A} {p q p' q' : ND A} → p ~ p' → q ~ q' → p ⊕ q ~ p' ⊕ q'
 plus-cong eq eq' = mk~ (conv-cong (~conv-l eq) (~conv-l eq'))
                         (conv-cong (~conv-r eq) (~conv-r eq'))
@@ -87,6 +91,55 @@ _~⟨⟩_  x eq = eq
 _∎ : ∀ {A : Set} (x : ND A) → x ~ x
 _∎  x = ~refl
 
+
+private
+  variable
+    ℓ0 : Level
+
+postulate
+  -- fold over an if statements distributes the if over the folds
+  fold-if-distr : ∀ {A B : Set} {E : Effect} (f : A → B) (g : Alg E B) b x y
+                → (fold f g (if b then x else y))
+                  ≡ (if b then (fold f g x) else (fold f g y))
+
+  -- functional extensionality: if equal inputs produce equal outputs then the functions are equal
+  funext : Extensionality ℓ0 ℓ0
+
+distr-plus : ∀ {A} {p q : ND A} →
+  (impure (ChoiceOp , (λ b → if b then p else q))) ≡ p ⊕ q
+distr-plus = refl
+
+-- (p ⊕ q >>= f) ≡ (p >>= f) ⊕ (q >>= f)
+-- since m >>= f = fold f impure m, and a = p ⊕ vx, we can use fold-if-distr
+distr-plus-bind : ∀ {A B} {f : A → ND B} {p q : ND A} →
+  (impure (ChoiceOp , (λ b → if b then p else q)) >>= f) ≡ (p >>= f) ⊕ (q >>= f)
+distr-plus-bind {f = f} = (cong (λ X → impure (ChoiceOp , X)) (funext (λ x → fold-if-distr f impure x _ _)))
+
+-- If a converges to v, and f (v) converges to w, than a >>= f converges to w
+bind-cong-conv : ∀ {A B} {a : ND A} {f : A → ND B} {v : A} {w : B}
+ → (a ⇓ v) → f v ⇓ w → (a >>= f) ⇓ w
+-- a = pure x
+bind-cong-conv {a = pure x} (conv-ret refl) d = d
+-- a = p ⊕ q, where p converges to v
+bind-cong-conv {a = impure (ChoiceOp , .(λ b → if b then _ else q))} {f = f} (conv-l c q refl) d
+  = conv-l
+      -- show that left side converges to w
+      (bind-cong-conv c d)
+      -- given an instance of ND B
+      (q >>= f)
+      -- show that (a >>= f) ≡ (p >>= f) ⊕ (q >>= f)
+      (distr-plus-bind)
+-- a = p ⊕ q, where q converges to v
+bind-cong-conv {a = impure (ChoiceOp , .(λ b → if b then p else _))} {f = f} (conv-r p c refl) d
+  = conv-r
+      -- give an instance of ND B
+      (p >>= f)
+      -- show that the right side converges to w
+      (bind-cong-conv c d)
+      -- show that (a >>= f) ≡ (p >>= f) ⊕ (q >>= f)
+      (distr-plus-bind)
+
+{-
 bind-cong-conv : ∀ {A B} {a : ND A} {f : A → ND B} {v : A} {w : B}
  → (a ⇓ v) → f v ⇓ w → (a >>= f) ⇓ w
 
@@ -95,8 +148,12 @@ bind-cong-conv {a = pure x} (conv-ret refl) d = d
 
 -- bind-cong-conv {a = pure x} (conv-ret r) d = subst r {!   !}
 
-bind-cong-conv {a = impure (ChoiceOp, k)} (conv-l c q refl) d = {!   !}
-bind-cong-conv (conv-r p' c x) d = {!   !}
+bind-cong-conv (conv-l c q x) d with impure-inj x
+... | x = ?
+-- bind-cong-conv (conv-l c q refl) d = conv-l x1 x2 refl where
+--   x1 = ?
+--   x2 = ?
+bind-cong-conv (conv-r p c refl) d = {!   !}
 -- bind-cong-conv {a = pure x} (conv-ret refl) d = {!   !}
 -- bind-cong-conv {a = impure (ChoiceOp , k)} d = {!   !}
 -- bind-cong-conv {a = impure (ChoiceOp , k)} (conv-l c _ x₁) d with f-inj (impure-inj x₁)
@@ -104,15 +161,33 @@ bind-cong-conv (conv-r p' c x) d = {!   !}
 -- bind-cong-conv {a = impure (ChoiceOp , k)} (conv-l c vx x₁) d with ⊕-inj x₁
 -- ... | (r1 , r2) = ?
 -- bind-cong-conv {a = impure (ChoiceOp , k)} (conv-r _ c x₁) d = {!   !}
-
 -- Original:
 -- https://agda.readthedocs.io/en/v2.6.1/language/function-definitions.html#dot-patterns
 -- bind-cong-conv {a = a1 ⊕ a2} (conv-l c .a2) d = conv-l (bind-cong-conv c d) _
 -- bind-cong-conv {a = a1 ⊕ a2} (conv-r .a1 c) d = conv-r _ (bind-cong-conv c d)
+-}
 
+-- postulate
+--   distr-plus-bind-left' : ∀ {A B} {f : A → ND B} {p q : ND B} {k} →
+--     (impure (ChoiceOp , k) >>= f) ≡ (p ⊕ q) → {p' : ND A} → ∃[ p' ] (p' >>= f ≡ p)
 
--- bind-cong-conv' : ∀ {A B} {a : ND A} {f : A → ND B} {w : B} 
---                   → (a >>= f) ⇓ w → ∃[ v ] ((a ⇓ v) × f v ⇓ w)
+-- a >>= f converges to w implies there exists a v such that a converges to v and f v converges to w
+bind-cong-conv' : ∀ {A B} {a : ND A} {f : A → ND B} {w : B} 
+                  → (a >>= f) ⇓ w → ∃[ v ] ((a ⇓ v) × f v ⇓ w)
+
+-- case pure xa : (pure xa >> f) converges to w, so xa converges to xa and f v converges to w
+bind-cong-conv' {a = pure xa} c = xa , conv-ret refl , c
+-- case (a >> f) = (p ⊕ q) >> f, where (p << f) converges to w
+-- However, we instead get the case (a >> f) = p ⊕ q converges to w, where p converges to w.
+bind-cong-conv' {a = impure (ChoiceOp , k)} {f = f} (conv-l {p = p} c q x) = _ , {!   !}
+-- bind-cong-conv' {a = impure (ChoiceOp , .(λ x → fold f impure (λ b → if b then (p' >>= f) else ('q >>= f))))} {f = f} (conv-l {p = p} c q x) = _ , {!   !}
+-- bind-cong-conv' {a = impure (ChoiceOp , k)} {f = f} (conv-l {p = p} c q x) = ?
+-- bind-cong-conv' {a = pure x} c = x , ((conv-ret refl) , c)
+
+-- bind-cong-conv' {a = impure (ChoiceOp , .(λ _ → if _ then _ else _))} (conv-l c .(_ >>= _) refl) with bind-cong-conv' {a = _} c
+-- ... | v' , d1 , d2 =  v' , {!   !} , d2
+-- bind-cong-conv' {a = impure (ChoiceOp , .(λ _ → if _ then _ else _))} (conv-r .(_ >>= _) c refl) with bind-cong-conv' {a = _} c
+-- ... | v' , d1 , d2 =  v' , conv-r _ _ _ , d2
 
 -- bind-cong-conv' {a = ret x} c = x , (conv-ret x , c)
 -- bind-cong-conv' {a = a1 ⊕ a2} (conv-l c .(a2 Bind.>>= _)) with bind-cong-conv' {a = a1} c
@@ -392,4 +467,4 @@ bind-cong-conv (conv-r p' c x) d = {!   !}
 -- pos-getJust : ∀ {A B} (p : ND B) {f : A → ND B} (m : Maybe A) → ∃[ v ] p ⇓ v → (∀ w → ∃[ v ] f w ⇓ v) → ∃[ v ] (getJust p f m) ⇓ v
 -- pos-getJust p nothing c f = c
 -- pos-getJust p (just x) c f = f x
-    
+           
