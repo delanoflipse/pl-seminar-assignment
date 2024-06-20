@@ -41,23 +41,42 @@ _ : x ≡ 7
 _ = refl
 
 +-assoc : ∀ (m n p : Nat) → (m + n) + p ≡ m + (n + p)
-+-assoc zero n p =
++-assoc zero n p = refl
++-assoc (suc m) n p = cong suc (+-assoc m n p)
+
+cong-app' : ∀ {A B : Set} {f g : A → B} → f ≡ g → ∀ (x) → f x ≡ g x
+cong-app' refl x = refl
+
+subst' : ∀ {A : Set} {x y : A} (P : A → Set)
+  → x ≡ y
+    ---------
+  → P x → P y
+
+subst' P refl Px = Px
+
+trans' : ∀ {A : Set} {x y z : A}
+  → x ≡ y
+  → y ≡ z
+    -----
+  → x ≡ z
+
+trans' {x = x} {y = y} {z = z} x=y y=z =
   begin
-    (zero + n) + p
-  ≡⟨⟩
-    n + p
-  ≡⟨⟩
-    zero + (n + p)
+    x
+  ≡⟨ x=y ⟩
+    y
+  ≡⟨ y=z ⟩
+    z
   ∎
-+-assoc (suc m) n p =
-  begin
-    (suc m + n) + p
-  ≡⟨⟩
-    suc (m + n) + p
-  ≡⟨⟩
-    suc ((m + n) + p)
-  ≡⟨ {!   !} ⟩
-    suc (m + (n + p))
-  ≡⟨⟩
-    suc m + (n + p)
-  ∎
+
++-identity : ∀ (n : Nat) → n + zero ≡ n
++-identity zero = refl
++-identity (suc n) = cong suc (+-identity n)
+
++-suc : ∀  (m n : Nat) → m + suc n ≡ suc (m + n)
++-suc zero n = refl
++-suc (suc m) n = cong suc (+-suc m n)
+
++-comm : ∀ {n m : Nat} → n + m ≡ m + n
++-comm {n = n} {m = zero} = (+-identity n)
++-comm {n = n} {m = suc m} = trans (+-suc n m) (cong suc (+-comm {n = n} {m = m}))
