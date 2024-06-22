@@ -110,7 +110,6 @@ fold-if-distr : ∀ {A B : Set} {E : Effect} (f : A → B) (g : Alg E B) b x y
 fold-if-distr f g false x y = refl
 fold-if-distr f g true x y = refl
 
-
 -- definition of p ⊕ q equals its definition
 distr-plus : ∀ {A} {p q : ND A} →
   (impure (ChoiceOp , (λ b → if b then p else q))) ≡ p ⊕ q
