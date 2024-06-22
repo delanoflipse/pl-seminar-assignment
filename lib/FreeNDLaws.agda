@@ -199,13 +199,10 @@ bind-cong-conv (conv-r p c refl) d = {!   !}
 Bool-eta : ∀ {A : Set} (f : Bool → A) → f ≡ λ b → if b then f true else f false
 Bool-eta f = funext λ {true → refl ; false → refl }
 
-Bool-eta' : ∀ {A : Set} (f : Bool → A) → (λ b → if b then f true else f false) ≡ f
-Bool-eta' f = funext λ {true → refl ; false → refl }
-
 plus-extraction :
   ∀ {A : Set} {cont : Effect.Ret NDEffect ChoiceOp → Free NDEffect A}
   → ∃ (λ p → ∃ (λ q → p ⊕ q ≡ impure (ChoiceOp , cont)))
-plus-extraction {cont = cont} = (cont true) , (cont false) , impure-inj' (Bool-eta' cont)
+plus-extraction {cont = cont} = (cont true) , (cont false) , impure-inj' (sym (Bool-eta cont))
 
 -- a >>= f converges to w implies there exists a v such that a converges to v and f v converges to w
 bind-cong-conv' : ∀ {A B} {a : ND A} {f : A → ND B} {w : B} 
@@ -435,6 +432,7 @@ plus-distr-dup  {p = pure x} {q} {f} =
   ~⟨  ~symm plus-assoc ⟩
   f x ⊕ q ⊕ q
   ∎
+
 plus-distr-dup {p = impure (ZeroOp , cont)} = ~choice-op-cong ~zero-refl ~refl
 plus-distr-dup {p = impure (ChoiceOp , cont)} {q} {f} with plus-extraction {cont = cont}
 ... | p1 , p2 , refl = ((p1 ⊕ p2) >>= f) ⊕ q
