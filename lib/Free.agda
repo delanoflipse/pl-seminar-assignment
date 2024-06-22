@@ -26,6 +26,7 @@ fold : {A B : Set} {E : Effect} (g : A → B) → Alg E B → Free E A → B
 fold g a (pure x)       = g x
 fold g a (impure (op , k))  = a (op , fold g a ∘ k)
 
+infixl 1 _>>=_
 _>>=_ : ∀ {A B E} → Free E A → (A → Free E B) → Free E B
 m >>= f = fold f impure m
 
