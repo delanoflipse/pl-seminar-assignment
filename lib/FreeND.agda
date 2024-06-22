@@ -28,7 +28,8 @@ NDRet ZeroOp = ⊥
 NDRet ChoiceOp = Bool
 
 NDEffect : Effect
-NDEffect = NDOp ▷ NDRet
+-- NDEffect = NDOp ▷ NDRet
+NDEffect = record { Op = NDOp ; Ret = NDRet }
 
 NDFree = Free NDEffect
 
