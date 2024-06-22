@@ -7,3 +7,7 @@ Sources:
 - [Interpreters with Non-Determinism Using a Free Monad](http://www.casperbp.net/posts/2019-04-nondeterminism-using-a-free-monad/)
 - [Programming Language Foundations in Agda](https://plfa.github.io/)
 - [Agda Standard Library](https://agda.github.io/agda-stdlib/master)
+
+
+## Relevant papers
+- [What is the meaning of these constant interruptions? - Hutton and Wright, 2007](https://www.cs.tufts.edu/~nr/cs257/archive/graham-hutton/constant-interruptions.pdf)

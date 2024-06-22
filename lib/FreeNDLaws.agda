@@ -171,6 +171,9 @@ bind-cong-conv (conv-r p c refl) d = {!   !}
 --   distr-plus-bind-left' : ∀ {A B} {f : A → ND B} {p q : ND B} {k} →
 --     (impure (ChoiceOp , k) >>= f) ≡ (p ⊕ q) → {p' : ND A} → ∃[ p' ] (p' >>= f ≡ p)
 
+Bool-eta : ∀ {A : Set} (f : Bool → A) → f ≡ λ b → if b then f true else f false
+Bool-eta f = funext λ {true → refl ; false → refl }
+
 -- a >>= f converges to w implies there exists a v such that a converges to v and f v converges to w
 bind-cong-conv' : ∀ {A B} {a : ND A} {f : A → ND B} {w : B} 
                   → (a >>= f) ⇓ w → ∃[ v ] ((a ⇓ v) × f v ⇓ w)
@@ -179,7 +182,24 @@ bind-cong-conv' : ∀ {A B} {a : ND A} {f : A → ND B} {w : B}
 bind-cong-conv' {a = pure xa} c = xa , conv-ret refl , c
 -- case (a >> f) = (p ⊕ q) >> f, where (p << f) converges to w
 -- However, we instead get the case (a >> f) = p ⊕ q converges to w, where p converges to w.
-bind-cong-conv' {a = impure (ChoiceOp , k)} {f = f} (conv-l {p = p} c q x) = _ , {!   !}
+bind-cong-conv' {a = impure (ChoiceOp , k)} {f = f} (conv-l {p = p} c q x)
+  with f-inj (impure-inj x) true
+...  | refl with bind-cong-conv' {a = k true} {f = f} c
+...            | (v' , r' , t')
+                 =   _
+                   , conv-l r'
+                       (k false)
+                       (cong (impure ∘ (ChoiceOp ,_)) (Bool-eta k))
+                   , t'
+bind-cong-conv' {a = impure (ChoiceOp , k)} {f = f} (conv-r {q = q} p c x)
+  with f-inj (impure-inj x) false
+...  | refl with bind-cong-conv' {a = k false} {f = f} c
+... | (v' , r' , t')
+    = _
+    , conv-r (k true) r' (cong (impure ∘ (ChoiceOp ,_)) (Bool-eta k))
+    , t'
+
+{-
 -- bind-cong-conv' {a = impure (ChoiceOp , k)} {f = f} (conv-l {p = .(_ >>= f)} c .(_ >>= f) x) = _ , {!   !}
 -- bind-cong-conv' {a = impure (ChoiceOp , .(λ x → fold f impure (λ b → if b then (p' >>= f) else ('q >>= f))))} {f = f} (conv-l {p = p} c q x) = _ , {!   !}
 -- bind-cong-conv' {a = impure (ChoiceOp , k)} {f = f} (conv-l {p = p} c q x) = ?
@@ -196,37 +216,41 @@ bind-cong-conv' {a = impure (ChoiceOp , k)} {f = f} (conv-l {p = p} c q x) = _ ,
 -- ... | v' , d1 , d2 = v' , conv-l d1 a2 , d2
 -- bind-cong-conv' {a = a1 ⊕ a2} (conv-r .(a1 Bind.>>= _) c) with bind-cong-conv' {a = a2} c
 -- ... | v' , d1 , d2 = v' , conv-r a1 d1 , d2
+-}
 
+bind-cong : ∀ {A B}  {a b : ND A} (eq : a ~ b)
+            {k l : A → ND B} (h : ∀ a → (k a) ~ (l a)) →
+            (a >>= k) ~ (b >>= l)
 
--- bind-cong : ∀ {A B}  {a b : ND A} (eq : a ~ b)
---             {k l : A → ND B} (h : ∀ a → (k a) ~ (l a)) →
---             (a >>= k) ~ (b >>= l)
--- bind-cong {a = a} {b} (mk~ le ri) {k} {l} h = mk~  ri'  le'
---   where ri' : ∀ {v} → (a >>= k) ⇓ v → (b >>= l) ⇓ v
---         ri' c with bind-cong-conv' {a = a} c
---         ... | w , c1 , c2 = bind-cong-conv (le c1) (~conv-l (h w) c2)
---         le' : ∀ {v} → (b >>= l) ⇓ v → (a >>= k) ⇓ v
---         le' c with bind-cong-conv' {a = b} c
---         ... | w , c1 , c2 = bind-cong-conv (ri c1) (~conv-r (h w) c2)
+bind-cong {a = a} {b} (mk~ le ri) {k} {l} h = mk~  ri'  le'
+  where ri' : ∀ {v} → (a >>= k) ⇓ v → (b >>= l) ⇓ v
+        ri' c with bind-cong-conv' {a = a} c
+        ... | w , c1 , c2 = bind-cong-conv (le c1) (~conv-l (h w) c2)
+        le' : ∀ {v} → (b >>= l) ⇓ v → (a >>= k) ⇓ v
+        le' c with bind-cong-conv' {a = b} c
+        ... | w , c1 , c2 = bind-cong-conv (ri c1) (~conv-r (h w) c2)
 
--- bind-cong-l : ∀ {A B}  {a b : ND A} (eq : a ~ b)
---             (k : A → ND B) →
---             (a >>= k) ~ (b >>= k)
--- bind-cong-l eq _ = bind-cong  eq  (λ _ → ~refl)
+bind-cong-l : ∀ {A B}  {a b : ND A} (eq : a ~ b)
+            (k : A → ND B) →
+            (a >>= k) ~ (b >>= k)
+bind-cong-l eq _ = bind-cong  eq  (λ _ → ~refl)
 
--- bind-cong-r : ∀ {A B}  (a : ND A)
---               {k l : A → ND B} (h : ∀ a → (k a) ~ (l a)) →
---               (a >>= k) ~ (a >>= l)
--- bind-cong-r a f = bind-cong {a = a}  ~refl f
+bind-cong-r : ∀ {A B}  (a : ND A)
+              {k l : A → ND B} (h : ∀ a → (k a) ~ (l a)) →
+              (a >>= k) ~ (a >>= l)
+bind-cong-r a f = bind-cong {a = a}  ~refl f
 
 
 -- ----------------
 -- -- monad laws --
 -- ----------------
 
--- bind-assoc : ∀{A B C}(m : ND A)
---                  {k : A → ND B}{l : B → ND C} →
---                  ((m >>= k) >>= l) ~ (m >>= λ a → k a >>= l)
+bind-assoc : ∀{A B C}(m : ND A)
+                 {k : A → ND B} {l : B → ND C} →
+                 ((m >>= k) >>= l) ~ (m >>= λ a → k a >>= l)
+bind-assoc (pure x) = ~refl
+bind-assoc (impure (ZeroOp , k)) = {!   !}
+bind-assoc (impure (ChoiceOp , snd)) = {!   !}
 -- bind-assoc (ret x) =  ~refl
 -- bind-assoc zero =  ~refl
 -- bind-assoc (m ⊕ m') = plus-cong (bind-assoc  m) (bind-assoc m')
@@ -469,4 +493,4 @@ bind-cong-conv' {a = impure (ChoiceOp , k)} {f = f} (conv-l {p = p} c q x) = _ ,
 -- pos-getJust : ∀ {A B} (p : ND B) {f : A → ND B} (m : Maybe A) → ∃[ v ] p ⇓ v → (∀ w → ∃[ v ] f w ⇓ v) → ∃[ v ] (getJust p f m) ⇓ v
 -- pos-getJust p nothing c f = c
 -- pos-getJust p (just x) c f = f x
-           
+             
