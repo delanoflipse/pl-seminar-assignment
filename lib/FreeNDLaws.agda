@@ -1,6 +1,7 @@
-open import Axiom.Extensionality.Propositional as Ext
+open import Axiom.Extensionality.Propositional
 open import Function
-open import Relation.Binary.PropositionalEquality
+open import Relation.Binary.PropositionalEquality hiding (Extensionality)
+open import Data.Maybe hiding (_>>=_)
 
 open import Data.Bool
 open import Data.Product
@@ -119,7 +120,7 @@ postulate
                   ≡ (if b then (fold f g x) else (fold f g y))
 
   -- functional extensionality: if equal inputs produce equal outputs then the functions are equal
-  funext : Ext.Extensionality ℓ0 ℓ0
+  funext : Extensionality ℓ0 ℓ0
 
 -- definition of p ⊕ q equals its definition
 distr-plus : ∀ {A} {p q : ND A} →
@@ -295,12 +296,12 @@ choice-op-equiv-conv : ∀ {A} {k1 k2 : Effect.Ret NDEffect ChoiceOp → Free ND
   → impure (ChoiceOp , k1) ~ impure (ChoiceOp , k2)
 choice-op-equiv-conv {A} {k1} {k2} refl = ~refl
 
-postulate
-  ~choice-op-cong : ∀ {A} {k1 k2 : Effect.Ret NDEffect ChoiceOp → Free NDEffect A}
-    → (k1 true) ~ (k2 true)
-    → (k1 false) ~ (k2 false)
-    → impure (ChoiceOp , k1) ~ impure (ChoiceOp , k2)
--- ~choice-op-cong {A} {k1} {k2} (mk~ ~conv-l₁ ~conv-r₁) (mk~ ~conv-l₂ ~conv-r₂) = {!   !}
+~choice-op-cong : ∀ {A} {k1 k2 : Effect.Ret NDEffect ChoiceOp → Free NDEffect A}
+  → (k1 true) ~ (k2 true)
+  → (k1 false) ~ (k2 false)
+  → impure (ChoiceOp , k1) ~ impure (ChoiceOp , k2)
+~choice-op-cong {A} {k1} {k2} eq1 eq2 with plus-extraction {cont = k1} | plus-extraction {cont = k2}
+... | p1 , q1 , refl | p2 , q2 , refl = plus-cong eq1 eq2
 
 -- monad law: bind is associative
 bind-assoc : ∀{A B C} (m : ND A) {k : A → ND B} {l : B → ND C}
@@ -458,138 +459,154 @@ plus-distr-dup {p = impure (ChoiceOp , cont)} {q} {f} with plus-extraction {cont
    ((p1 ⊕ p2) >>= λ x → f x ⊕ q) ⊕ q
   ∎
 
--- interchange : ∀  {A B} {p : ND A} {q : ND B} {f : A → ND B} → (∃[ v ] p ⇓ v)
---   → (p >>= f) ⊕ q ~ (p >>= λ x → f x ⊕ q)
--- interchange {p = ret x} _ =  ~refl
--- interchange {p = zero} (v , ())
--- interchange {p = p1 ⊕ p2} {q} {f} (v , conv-l c .p2) =
---   ((p1 >>= f) ⊕ (p2 >>= f) ⊕ q)
---   ~⟨ plus-assoc ⟩
---   ((p1 >>= f) ⊕ ((p2 >>= f) ⊕ q))
---   ~⟨ plus-cong-r (plus-distr-dup {p = p2}) ⟩
---   ((p1 >>= f) ⊕ ((p2 >>= λ x → f x ⊕ q) ⊕ q))
---   ~⟨ plus-cong-r plus-comm ⟩
---   ((p1 >>= f) ⊕ (q ⊕ (p2 >>= λ x → f x ⊕ q)))
---   ~⟨ ~symm plus-assoc ⟩
---   ((p1 >>= f) ⊕ q ⊕ (p2 >>= λ x → f x ⊕ q))
---   ~⟨ plus-cong-l (interchange ( v , c)) ⟩
---   (p1 ⊕ p2 >>= (λ x → f x ⊕ q))
---   ∎
--- interchange {p = p1 ⊕ p2} {q} {f} (v , conv-r .p1 c) = 
---   ((p1 >>= f) ⊕ (p2 >>= f) ⊕ q)
---   ~⟨ plus-cong-l plus-comm ⟩
---   ((p2 >>= f) ⊕ (p1 >>= f) ⊕ q)
---   ~⟨ plus-assoc ⟩
---   ((p2 >>= f) ⊕ ((p1 >>= f) ⊕ q))
---   ~⟨ plus-cong-r (plus-distr-dup {p = p1}) ⟩
---   ((p2 >>= f) ⊕ ((p1 >>= λ x → f x ⊕ q) ⊕ q))
---   ~⟨ plus-cong-r plus-comm ⟩
---   ((p2 >>= f) ⊕ (q ⊕ (p1 >>= λ x → f x ⊕ q)))
---   ~⟨ ~symm plus-assoc ⟩
---   ((p2 >>= f) ⊕ q ⊕ (p1 >>= λ x → f x ⊕ q))
---   ~⟨  plus-cong-l (interchange (v , c)) ⟩
---   ((p2 >>= λ x → f x ⊕ q) ⊕ (p1 >>= λ x → f x ⊕ q))
---   ~⟨ plus-comm ⟩
---   (p1 ⊕ p2 >>= (λ x → f x ⊕ q))
---   ∎
+interchange : ∀  {A B} {p : ND A} {q : ND B} {f : A → ND B} → (∃[ v ] p ⇓ v)
+  → (p >>= f) ⊕ q ~ (p >>= λ x → f x ⊕ q)
+interchange {p = pure x} _ =  ~refl
+interchange {p = impure (ZeroOp , cont)} (v , conv-l x q ())
+interchange {p = impure (ZeroOp , cont)} (v , conv-r p x ())
+
+interchange {p = impure (ChoiceOp , cont)} {q} {f} (v , conv-l {p = p1'} cond p2' eq-pq) with plus-extraction {cont = cont}
+... | p1 , p2 , refl with (⊕-inj eq-pq)
+... | refl , refl = 
+  ((p1 ⊕ p2) >>= f) ⊕ q
+  ~⟨ plus-cong-l (~distr-plus-bind) ⟩
+  ((p1 >>= f) ⊕ (p2 >>= f) ⊕ q)
+  ~⟨ plus-assoc ⟩
+  ((p1 >>= f) ⊕ ((p2 >>= f) ⊕ q))
+  ~⟨ plus-cong-r (plus-distr-dup {p = p2}) ⟩
+  ((p1 >>= f) ⊕ ((p2 >>= λ x → f x ⊕ q) ⊕ q))
+  ~⟨ plus-cong-r plus-comm ⟩
+  ((p1 >>= f) ⊕ (q ⊕ (p2 >>= λ x → f x ⊕ q)))
+  ~⟨ ~symm plus-assoc ⟩
+  (((p1 >>= f) ⊕ q) ⊕ (p2 >>= λ x → f x ⊕ q))
+  ~⟨  plus-cong-l (interchange (v , cond)) ⟩
+  ((p1 >>= λ x → f x ⊕ q) ⊕ (p2 >>= λ x → f x ⊕ q))
+  ~⟨ ~distr-plus-bind' ⟩
+  ((p1 ⊕ p2) >>= (λ x → f x ⊕ q))
+  ∎
+interchange {p = impure (ChoiceOp , cont)} {q} {f} (v , conv-r {q = p2'} p1' cond eq-pq) with plus-extraction {cont = cont}
+... | p1 , p2 , refl with (⊕-inj eq-pq)
+... | refl , refl = 
+  ((p1 ⊕ p2) >>= f) ⊕ q
+  ~⟨ plus-cong-l (~distr-plus-bind) ⟩
+  ((p1 >>= f) ⊕ (p2 >>= f) ⊕ q)
+  ~⟨ plus-cong-l plus-comm ⟩
+  ((p2 >>= f) ⊕ (p1 >>= f) ⊕ q)
+  ~⟨ plus-assoc ⟩
+  ((p2 >>= f) ⊕ ((p1 >>= f) ⊕ q))
+  ~⟨ plus-cong-r (plus-distr-dup {p = p1}) ⟩
+  ((p2 >>= f) ⊕ ((p1 >>= λ x → f x ⊕ q) ⊕ q))
+  ~⟨ plus-cong-r plus-comm ⟩
+  ((p2 >>= f) ⊕ (q ⊕ (p1 >>= λ x → f x ⊕ q)))
+  ~⟨ ~symm plus-assoc ⟩
+  ((p2 >>= f) ⊕ q ⊕ (p1 >>= λ x → f x ⊕ q))
+  ~⟨  plus-cong-l (interchange (v , cond)) ⟩
+  ((p2 >>= λ x → f x ⊕ q) ⊕ (p1 >>= λ x → f x ⊕ q))
+  ~⟨ plus-comm ⟩
+  ((p1 >>= λ x → f x ⊕ q) ⊕ (p2 >>= λ x → f x ⊕ q))
+  ~⟨ ~distr-plus-bind' ⟩
+  ((p1 ⊕ p2) >>= (λ x → f x ⊕ q))
+  ∎
 
 
-
--- -- Pattern matching
-
-
--- match : ∀ {A B C : Set} → (A → Maybe B) → ND C → (B → ND C) → A → ND C
--- match m d f a with m a
--- ... | just x =  f x
--- ... | nothing = d
-
--- getJust : ∀ {A B : Set} → ND B → (A → ND B) → Maybe A → ND B
--- getJust = match id
+-- Pattern matching
 
 
--- match-assoc : ∀{A B C D} (c : A → Maybe B) (m : ND A) {d : ND C}
---                {f : B → ND C}{g : C → ND D} →
---                ((m >>= match c d f) >>= g) ~ (m >>= match c (d >>= g) (λ x → f x >>=  g))
--- match-assoc {A} {B} c m {d} {f} {g} =
---   ~trans (bind-assoc m) ( bind-cong-r m (λ x → cases c x ))
---   where 
---   cases : (c : A → Maybe B) (x : A) →
---           (match c d f x >>= g) ~ (match c (d >>= g) (λ y → f y >>= g) x)
---   cases c x with c x
---   ... | just y  =  ~refl
---   ... | nothing =  ~refl
+match : ∀ {A B C : Set} → (A → Maybe B) → ND C → (B → ND C) → A → ND C
+match m d f a with m a
+... | just x =  f x
+... | nothing = d
 
--- getJust-assoc : ∀{B C D} (m : ND (Maybe B)) {d : ND C}
---                {f : B → ND C}{g : C → ND D} →
---                ((m >>= getJust d f) >>= g) ~ (m >>= getJust (d >>= g) (λ x → f x >>= g))
--- getJust-assoc = match-assoc id
+getJust : ∀ {A B : Set} → ND B → (A → ND B) → Maybe A → ND B
+getJust = match id
 
 
--- match-cong-default : ∀{A B C} (c : A → Maybe B) (m : ND A)
---   {d : ND C} {e : ND C} {f : B → ND C}
---                (h : d ~ e) →
---                (m >>= match c d f) ~ (m >>= match c e f)
--- match-cong-default {A} c m {d} {e} {f} h =  bind-cong-r m   cases
---   where cases : (a : A) → (match c d f a) ~ (match c e f a)
---         cases a with c a
---         ...| just x =  ~refl
---         ...| nothing = h
+match-assoc : ∀{A B C D} (c : A → Maybe B) (m : ND A) {d : ND C}
+               {f : B → ND C}{g : C → ND D} →
+               ((m >>= match c d f) >>= g) ~ (m >>= match c (d >>= g) (λ x → f x >>=  g))
+match-assoc {A} {B} c m {d} {f} {g} =
+  ~trans (bind-assoc m) ( bind-cong-r m (λ x → cases c x ))
+  where 
+  cases : (c : A → Maybe B) (x : A) →
+          (match c d f x >>= g) ~ (match c (d >>= g) (λ y → f y >>= g) x)
+  cases c x with c x
+  ... | just y  =  ~refl
+  ... | nothing =  ~refl
+
+getJust-assoc : ∀{B C D} (m : ND (Maybe B)) {d : ND C}
+               {f : B → ND C}{g : C → ND D} →
+               ((m >>= getJust d f) >>= g) ~ (m >>= getJust (d >>= g) (λ x → f x >>= g))
+getJust-assoc = match-assoc id
 
 
--- getJust-cong-default : ∀{B C} (m : ND (Maybe B))
---   {d : ND C} {e : ND C} {f : B → ND C}
---                (h : d ~ e) →
---                (m >>= getJust d f) ~ (m >>= getJust e f)
--- getJust-cong-default = match-cong-default id
+match-cong-default : ∀{A B C} (c : A → Maybe B) (m : ND A)
+  {d : ND C} {e : ND C} {f : B → ND C}
+               (h : d ~ e) →
+               (m >>= match c d f) ~ (m >>= match c e f)
+
+match-cong-default {A} c m {d} {e} {f} h =  bind-cong-r m   cases
+  where cases : (a : A) → (match c d f a) ~ (match c e f a)
+        cases a with c a
+        ...| just x =  ~refl
+        ...| nothing = h
 
 
--- match-cong : ∀{A B C} (c : A → Maybe B) (m : ND A) {d : ND C}
---                {f : B → ND C} {g : B → ND C}
---                (h : ∀ x → f x ~ g x) →
---                (m >>= match c d f) ~ (m >>= match c d g)
--- match-cong {A} c m {d} {f} {g} e =  bind-cong-r m  cases
---   where cases : (x : A) → match c d f x ~ match c d g x
---         cases x with c x
---         ...| just y =  e y
---         ...| nothing =  ~refl
-
--- getJust-cong : ∀{B C} (m : ND (Maybe B)) {d : ND C}
---                {f : B → ND C} {g : B → ND C}
---                (h : ∀ x → f x ~ g x) →
---                (m >>= getJust d f) ~ (m >>= getJust d g)
--- getJust-cong = match-cong id
-
--- match-distr :  ∀{A B C} (c : A → Maybe B)
---             {p q : ND C} {f : B → ND C} a
---             → match c p f a ⊕ q ~ match c (p ⊕ q) (λ x → f x ⊕ q) a
--- match-distr c a with c a
--- ... | nothing = ~refl
--- ... | just x = ~refl
+getJust-cong-default : ∀{B C} (m : ND (Maybe B))
+  {d : ND C} {e : ND C} {f : B → ND C}
+               (h : d ~ e) →
+               (m >>= getJust d f) ~ (m >>= getJust e f)
+getJust-cong-default = match-cong-default id
 
 
--- match-interchange :  ∀{A B C} (c : A → Maybe B) {m : ND A}
---             {p q : ND C} {f : B → ND C} → ∃[ v ] m ⇓ v
---             → (m >>= λ a → match c p f a) ⊕ q ~ (m >>= λ a → match c (p ⊕ q) (λ x → f x ⊕ q) a)
--- match-interchange c {m} d = ~trans (interchange d) (bind-cong-r m ( λ a → match-distr c a))
+match-cong : ∀{A B C} (c : A → Maybe B) (m : ND A) {d : ND C}
+               {f : B → ND C} {g : B → ND C}
+               (h : ∀ x → f x ~ g x) →
+               (m >>= match c d f) ~ (m >>= match c d g)
+match-cong {A} c m {d} {f} {g} e =  bind-cong-r m  cases
+  where cases : (x : A) → match c d f x ~ match c d g x
+        cases x with c x
+        ...| just y =  e y
+        ...| nothing =  ~refl
+
+getJust-cong : ∀{B C} (m : ND (Maybe B)) {d : ND C}
+               {f : B → ND C} {g : B → ND C}
+               (h : ∀ x → f x ~ g x) →
+               (m >>= getJust d f) ~ (m >>= getJust d g)
+getJust-cong = match-cong id
+
+match-distr :  ∀{A B C} (c : A → Maybe B)
+            {p q : ND C} {f : B → ND C} a
+            → match c p f a ⊕ q ~ match c (p ⊕ q) (λ x → f x ⊕ q) a
+match-distr c a with c a
+... | nothing = ~refl
+... | just x = ~refl
 
 
--- getJust-interchange :  ∀{B C} {m : ND (Maybe B)}
---             {p q : ND C} {f : B → ND C} → ∃[ v ] m ⇓ v
---             → (m >>= λ a → getJust p f a) ⊕ q ~ (m >>= λ a → getJust (p ⊕ q) (λ x → f x ⊕ q) a)
--- getJust-interchange = match-interchange id
+match-interchange :  ∀{A B C} (c : A → Maybe B) {m : ND A}
+            {p q : ND C} {f : B → ND C} → ∃[ v ] m ⇓ v
+            → (m >>= λ a → match c p f a) ⊕ q ~ (m >>= λ a → match c (p ⊕ q) (λ x → f x ⊕ q) a)
+match-interchange c {m} d = ~trans (interchange d) (bind-cong-r m ( λ a → match-distr c a))
+
+
+getJust-interchange :  ∀{B C} {m : ND (Maybe B)}
+            {p q : ND C} {f : B → ND C} → ∃[ v ] m ⇓ v
+            → (m >>= λ a → getJust p f a) ⊕ q ~ (m >>= λ a → getJust (p ⊕ q) (λ x → f x ⊕ q) a)
+getJust-interchange = match-interchange id
 
 
 -- -- reasoning about convergence
 
--- pos-ret : ∀ {A} {x : A} → ∃[ v ] ret x ⇓ v
--- pos-ret {x = x} = x , conv-ret x
--- pos-plus-l : ∀ {A} {p q : ND A} → ∃[ v ] p ⇓ v → ∃[ v ] p ⊕ q ⇓ v
--- pos-plus-l (v , c) = v , conv-l c _
--- pos-bind : ∀ {A B} (p : ND A) {f : A → ND B} → ∃[ v ] p ⇓ v → (∀ w → ∃[ v ] f w ⇓ v) → ∃[ v ] (p >>= f) ⇓ v
--- pos-bind p (v , c) f with f v
--- ...| w , d =  w , bind-cong-conv  c d
+pos-ret : ∀ {A} {x : A} → ∃[ v ] ret x ⇓ v
+pos-ret {x = x} = x , conv-ret x
 
--- pos-getJust : ∀ {A B} (p : ND B) {f : A → ND B} (m : Maybe A) → ∃[ v ] p ⇓ v → (∀ w → ∃[ v ] f w ⇓ v) → ∃[ v ] (getJust p f m) ⇓ v
--- pos-getJust p nothing c f = c
--- pos-getJust p (just x) c f = f x
- 
+pos-plus-l : ∀ {A} {p q : ND A} → ∃[ v ] p ⇓ v → ∃[ v ] p ⊕ q ⇓ v
+pos-plus-l (v , c) = v , conv-l c _ refl
+
+pos-bind : ∀ {A B} (p : ND A) {f : A → ND B} → ∃[ v ] p ⇓ v → (∀ w → ∃[ v ] f w ⇓ v) → ∃[ v ] (p >>= f) ⇓ v
+pos-bind p (v , c) f with f v
+...| w , d =  w , bind-cong-conv  c d
+
+pos-getJust : ∀ {A B} (p : ND B) {f : A → ND B} (m : Maybe A) → ∃[ v ] p ⇓ v → (∀ w → ∃[ v ] f w ⇓ v) → ∃[ v ] (getJust p f m) ⇓ v
+pos-getJust p nothing c f = c
+pos-getJust p (just x) c f = f x
+  
