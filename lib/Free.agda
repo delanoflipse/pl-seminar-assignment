@@ -39,6 +39,11 @@ mkFreeMonad = record
   ; _>>=_ = _>>=_
   }
 
+impure-inj' : ∀ {A : Set} {C : Effect} {o} {k k′ : Effect.Ret C o → Free C A}
+          → k ≡ k′
+          → impure (o , k) ≡ impure (o , k′)
+impure-inj' refl = refl
+
 impure-inj : ∀ {A : Set} {C : Effect} {o} {k k′ : Effect.Ret C o → Free C A}
            → impure (o , k) ≡ impure (o , k′)
            → k ≡ k′

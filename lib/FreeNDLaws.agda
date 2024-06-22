@@ -1,8 +1,10 @@
+open import Axiom.Extensionality.Propositional as Ext
 open import Function
 open import Relation.Binary.PropositionalEquality
 
 open import Data.Bool
 open import Data.Product
+open import Data.Empty
 open import Free
 open import FreeND
 open import Effect
@@ -17,16 +19,27 @@ infix 7 _∎
 infix 5 _⇓_
 
 -- convergence rules for ND
-data _⇓_ {A : Set} (nd : ND A) (x : A) : Set where
+-- data _⇓_ {A : Set} (nd : ND A) (x : A) : Set where
+--   -- ret x converges to x
+--   -- Args: a proof that nd ≡ ret x 
+--   conv-ret : nd ≡ ret x → nd ⇓ x
+--   -- p ⊕ q converges to v if p converges to v
+--   -- Args: proof p converges to x, q: ND A, proof that nd = p ⊕ q
+--   conv-l : ∀ {p} → p ⇓ x → (q : ND A) → nd ≡ (p ⊕ q) → nd ⇓ x
+--   -- p ⊕ q converges to v if q converges to v
+--   -- Args: p: ND A, proof q converges to x, proof of that nd = p ⊕ q
+--   conv-r : ∀ {q} → (p : ND A) → q ⇓ x → nd ≡ (p ⊕ q) → nd ⇓ x
+
+data _⇓_ {A : Set} : ND A → A → Set where
   -- ret x converges to x
   -- Args: a proof that nd ≡ ret x 
-  conv-ret : nd ≡ ret x → nd ⇓ x
+  conv-ret : (x : A) → pure x ⇓ x
   -- p ⊕ q converges to v if p converges to v
   -- Args: proof p converges to x, q: ND A, proof that nd = p ⊕ q
-  conv-l : ∀ {p} → p ⇓ x → (q : ND A) → nd ≡ (p ⊕ q) → nd ⇓ x
+  conv-l : ∀{p} {x} {nd} → p ⇓ x → (q : ND A) → nd ≡ p ⊕ q → nd ⇓ x
   -- p ⊕ q converges to v if q converges to v
   -- Args: p: ND A, proof q converges to x, proof of that nd = p ⊕ q
-  conv-r : ∀ {q} → (p : ND A) → q ⇓ x → nd ≡ (p ⊕ q) → nd ⇓ x
+  conv-r : ∀{q} {x} {nd} → (p : ND A) → q ⇓ x → nd ≡ p ⊕ q → nd ⇓ x
 
 -- data _⇓_ {A : Set} : ND A → A → Set where
 --   conv-ret : (x : A) → ret x ⇓ x
@@ -51,6 +64,9 @@ open _~_ public
 ~trans eq eq' = mk~ ( λ c → ~conv-l eq' (~conv-l eq c))
                     ( λ c → ~conv-r eq (~conv-r eq' c))
 
+~eq-refl : ∀ {A} {a b : ND A} → a ≡ b → a ~ b
+~eq-refl refl = ~refl
+
 ~symm : ∀ {A} {a b : ND A}
   (eq : a ~ b) → b ~ a
 ~symm eq = mk~ (~conv-r eq) (~conv-l eq)
@@ -70,7 +86,7 @@ conv-cong f g (conv-r p' c x₁) with ⊕-inj x₁
 -- conv-cong f g (conv-l c _) =  conv-l (f c) _
 -- conv-cong f g (conv-r _ c) =  conv-r _ (g c)
 
--- if p = p' and q = q' then p ⊕ q = p' ⊕ q'
+-- if p ~ p' and q ~ q' then p ⊕ q ~ p' ⊕ q'
 plus-cong : ∀ {A} {p q p' q' : ND A} → p ~ p' → q ~ q' → p ⊕ q ~ p' ⊕ q'
 plus-cong eq eq' = mk~ (conv-cong (~conv-l eq) (~conv-l eq'))
                         (conv-cong (~conv-r eq) (~conv-r eq'))
@@ -103,8 +119,9 @@ postulate
                   ≡ (if b then (fold f g x) else (fold f g y))
 
   -- functional extensionality: if equal inputs produce equal outputs then the functions are equal
-  funext : Extensionality ℓ0 ℓ0
+  funext : Ext.Extensionality ℓ0 ℓ0
 
+-- definition of p ⊕ q equals its definition
 distr-plus : ∀ {A} {p q : ND A} →
   (impure (ChoiceOp , (λ b → if b then p else q))) ≡ p ⊕ q
 distr-plus = refl
@@ -115,11 +132,19 @@ distr-plus-bind : ∀ {A B} {f : A → ND B} {p q : ND A} →
   (impure (ChoiceOp , (λ b → if b then p else q)) >>= f) ≡ (p >>= f) ⊕ (q >>= f)
 distr-plus-bind {f = f} = (cong (λ X → impure (ChoiceOp , X)) (funext (λ x → fold-if-distr f impure x _ _)))
 
+~distr-plus-bind : ∀ {A B} {f : A → ND B} {p q : ND A} →
+  ((p ⊕ q) >>= f) ~ (p >>= f) ⊕ (q >>= f)
+~distr-plus-bind {f = f} = ~eq-refl (distr-plus-bind)
+
+~distr-plus-bind' : ∀ {A B} {f : A → ND B} {p q : ND A} →
+  ((p >>= f) ⊕ (q >>= f)) ~ ((p ⊕ q) >>= f)
+~distr-plus-bind' {f = f} = ~eq-refl (sym (distr-plus-bind))
+
 -- If a converges to v, and f (v) converges to w, than a >>= f converges to w
 bind-cong-conv : ∀ {A B} {a : ND A} {f : A → ND B} {v : A} {w : B}
  → (a ⇓ v) → f v ⇓ w → (a >>= f) ⇓ w
 -- a = pure x
-bind-cong-conv {a = pure x} (conv-ret refl) d = d
+bind-cong-conv {a = pure x} (conv-ret .x) d = d
 -- a = p ⊕ q, where p converges to v
 bind-cong-conv {a = impure (ChoiceOp , .(λ b → if b then _ else q))} {f = f} (conv-l c q refl) d
   = conv-l
@@ -174,12 +199,20 @@ bind-cong-conv (conv-r p c refl) d = {!   !}
 Bool-eta : ∀ {A : Set} (f : Bool → A) → f ≡ λ b → if b then f true else f false
 Bool-eta f = funext λ {true → refl ; false → refl }
 
+Bool-eta' : ∀ {A : Set} (f : Bool → A) → (λ b → if b then f true else f false) ≡ f
+Bool-eta' f = funext λ {true → refl ; false → refl }
+
+plus-extraction :
+  ∀ {A : Set} {cont : Effect.Ret NDEffect ChoiceOp → Free NDEffect A}
+  → ∃ (λ p → ∃ (λ q → p ⊕ q ≡ impure (ChoiceOp , cont)))
+plus-extraction {cont = cont} = (cont true) , (cont false) , impure-inj' (Bool-eta' cont)
+
 -- a >>= f converges to w implies there exists a v such that a converges to v and f v converges to w
 bind-cong-conv' : ∀ {A B} {a : ND A} {f : A → ND B} {w : B} 
                   → (a >>= f) ⇓ w → ∃[ v ] ((a ⇓ v) × f v ⇓ w)
 
 -- case pure xa : (pure xa >> f) converges to w, so xa converges to xa and f v converges to w
-bind-cong-conv' {a = pure xa} c = xa , conv-ret refl , c
+bind-cong-conv' {a = pure xa} c = xa , conv-ret _ , c
 -- case (a >> f) = (p ⊕ q) >> f, where (p << f) converges to w
 -- However, we instead get the case (a >> f) = p ⊕ q converges to w, where p converges to w.
 bind-cong-conv' {a = impure (ChoiceOp , k)} {f = f} (conv-l {p = p} c q x)
@@ -245,119 +278,187 @@ bind-cong-r a f = bind-cong {a = a}  ~refl f
 -- -- monad laws --
 -- ----------------
 
-bind-assoc : ∀{A B C}(m : ND A)
-                 {k : A → ND B} {l : B → ND C} →
-                 ((m >>= k) >>= l) ~ (m >>= λ a → k a >>= l)
+impure-zero-is-zero : ∀ {A} {k : Effect.Ret NDEffect ZeroOp → Free NDEffect A} → impure (ZeroOp , k) ≡ zero
+impure-zero-is-zero {k = k} = impure-inj' {o = ZeroOp} {k = k} (funext λ ())
+
+fold-zero : ∀ {A B : Set} {f : A → ND B} → fold f impure zero ≡ zero
+fold-zero {A} {B} {f} = impure-inj' {o = ZeroOp} (funext λ ())
+
+fold-zero-equiv : ∀ {A} {k1 k2 : Effect.Ret NDEffect ZeroOp → Free NDEffect A} → impure (ZeroOp , k1) ≡ impure (ZeroOp , k2)
+fold-zero-equiv {A} {k1} {k2} with (impure-zero-is-zero {k = k1}) | (impure-zero-is-zero {k = k2})
+... | refl | refl = refl
+
+~zero-refl : ∀ {A : Set} {k1 k2 : Effect.Ret NDEffect ZeroOp → Free NDEffect A} → impure (ZeroOp , k1) ~ impure (ZeroOp , k2)
+~zero-refl {k1 = k1} {k2 = k2} with (fold-zero-equiv {k1 = k1} {k2 = k2})
+... | refl = ~refl
+
+
+choice-op-equiv-conv : ∀ {A} {k1 k2 : Effect.Ret NDEffect ChoiceOp → Free NDEffect A}
+  → k1 ≡ k2
+  → impure (ChoiceOp , k1) ~ impure (ChoiceOp , k2)
+choice-op-equiv-conv {A} {k1} {k2} refl = ~refl
+
+postulate
+  ~choice-op-cong : ∀ {A} {k1 k2 : Effect.Ret NDEffect ChoiceOp → Free NDEffect A}
+    → (k1 true) ~ (k2 true)
+    → (k1 false) ~ (k2 false)
+    → impure (ChoiceOp , k1) ~ impure (ChoiceOp , k2)
+-- ~choice-op-cong {A} {k1} {k2} (mk~ ~conv-l₁ ~conv-r₁) (mk~ ~conv-l₂ ~conv-r₂) = {!   !}
+
+-- monad law: bind is associative
+bind-assoc : ∀{A B C} (m : ND A) {k : A → ND B} {l : B → ND C}
+                      → ((m >>= k) >>= l) ~ (m >>= λ a → k a >>= l)
 bind-assoc (pure x) = ~refl
-bind-assoc (impure (ZeroOp , k)) = {!   !}
-bind-assoc (impure (ChoiceOp , snd)) = {!   !}
--- bind-assoc (ret x) =  ~refl
--- bind-assoc zero =  ~refl
--- bind-assoc (m ⊕ m') = plus-cong (bind-assoc  m) (bind-assoc m')
+bind-assoc (impure (ZeroOp , cont)) = ~zero-refl
+bind-assoc (impure (ChoiceOp , cont)) = ~choice-op-cong (bind-assoc (cont true)) (bind-assoc (cont false))
 
 
--- bind-unit-r : ∀ {A} (p : ND A)  → (p >>= return) ~ p
--- bind-unit-r (ret x) =  ~refl
--- bind-unit-r zero =  ~refl
--- bind-unit-r (p ⊕ q) = plus-cong (bind-unit-r p) (bind-unit-r q)
+bind-unit-r : ∀ {A} (p : ND A)  → (p >>= pure) ~ p
+bind-unit-r (pure x) =  ~refl
+bind-unit-r (impure (ZeroOp , cont)) =  ~zero-refl
+bind-unit-r (impure (ChoiceOp , cont)) = ~choice-op-cong (bind-unit-r (cont true)) (bind-unit-r (cont false))
 
--- bind-unit-l : ∀ {A B} {x : A} (f : A → ND B)  → (return x >>= f) ~ f x
--- bind-unit-l p =  ~refl
-
+bind-unit-l : ∀ {A B} {x : A} (f : A → ND B)  → (pure x >>= f) ~ f x
+bind-unit-l p =  ~refl
 
 -- -- -- lemmas --
 
--- conv-plus-unit-l : ∀ {A} {p : ND A} {v : A} → zero ⊕ p ⇓ v → p ⇓ v
--- conv-plus-unit-l (conv-r .zero c) = c
+-- zero ⊕ p ⇓ v implies p ⇓ v because zero does not converge to any value
+conv-plus-unit-l : ∀ {A} {p : ND A} {v : A} → zero ⊕ p ⇓ v → p ⇓ v
+conv-plus-unit-l (conv-r {q = q} p c x) with f-inj (impure-inj x) false
+... | refl = c
+conv-plus-unit-l (conv-l {p = p} c q x) with f-inj (impure-inj x) true
+conv-plus-unit-l (conv-l {p = .(impure (ZeroOp , (λ ())))} (conv-l c _ ()) q x) | refl 
+conv-plus-unit-l (conv-l {p = .(impure (ZeroOp , (λ ())))} (conv-r p c ()) q x) | refl
 
--- conv-plus-unit-r : ∀ {A} {p : ND A} {v : A} → p ⊕ zero ⇓ v → p ⇓ v
--- conv-plus-unit-r (conv-l c .zero) = c
+-- p ⊕ zero ⇓ v implies p ⇓ v because zero does not converge to any value
+conv-plus-unit-r : ∀ {A} {p : ND A} {v : A} → p ⊕ zero ⇓ v → p ⇓ v
+conv-plus-unit-r (conv-l c q x) with f-inj (impure-inj x) true
+... | refl = c
+conv-plus-unit-r (conv-r p arg x) with f-inj (impure-inj x) false
+conv-plus-unit-r (conv-r p (conv-l arg q ()) x) | refl
+conv-plus-unit-r (conv-r p (conv-r _ arg ()) x) | refl
+
+-- associativity of plus
+conv-plus-assoc : ∀ {A} {p q r : ND A} {v : A}
+                  → (p ⊕ q) ⊕ r ⇓ v
+                  → p ⊕ (q ⊕ r) ⇓ v
+conv-plus-assoc (conv-l (conv-ret x) q eq) with f-inj (impure-inj eq) true
+... | ()
+conv-plus-assoc (conv-l  {p = pq} (conv-l {p = p} cond q eqp-pq) r eqp-pq-r) with (⊕-inj eqp-pq-r)
+... | refl , refl with (⊕-inj eqp-pq)
+... | refl , refl = conv-l cond (q ⊕ r) refl
+
+conv-plus-assoc (conv-l (conv-r {q = q} p cond eqp-pq) r eqp-pq-r) with (⊕-inj eqp-pq-r)
+... | refl , refl with (⊕-inj eqp-pq)
+... | refl , refl = conv-r p (conv-l cond r refl) refl
+conv-plus-assoc {p = p} {q = q} {r = r} (conv-r pq cond eqp-pq-r) with (⊕-inj eqp-pq-r)
+... | refl , refl = conv-r p (conv-r q cond refl) refl
 
 
--- conv-plus-assoc : ∀ {A} {p q r : ND A} {v : A} → p ⊕ q ⊕ r ⇓ v → p ⊕ (q ⊕ r) ⇓ v
--- conv-plus-assoc (conv-l (conv-l c _) _) = conv-l c _
--- conv-plus-assoc (conv-l (conv-r _ c) _) = conv-r _ (conv-l c _)
--- conv-plus-assoc (conv-r p c) =  conv-r _ (conv-r _ c)
-
--- conv-plus-assoc' : ∀  {A} {p q r : ND A} {v : A} → p ⊕ (q ⊕ r) ⇓ v → p ⊕ q ⊕ r ⇓ v
--- conv-plus-assoc' (conv-l c _ ) = conv-l (conv-l c _) _
--- conv-plus-assoc' (conv-r _ (conv-l c _)) = conv-l (conv-r _ c) _
--- conv-plus-assoc' (conv-r _ (conv-r _ c)) = conv-r _ c
 
 
--- conv-plus-idem : ∀  {A} {v : A} {p : ND A} → p ⊕ p ⇓ v → p ⇓ v
--- conv-plus-idem (conv-l c _) =  c
--- conv-plus-idem (conv-r _ c) = c
+conv-plus-assoc' : ∀  {A} {p q r : ND A} {v : A}
+                   → p ⊕ (q ⊕ r) ⇓ v
+                   → (p ⊕ q) ⊕ r ⇓ v
+                   
+-- p converges to v
+conv-plus-assoc' {p = p} {q = q} {r = r} (conv-l cond qr eqp-p-qr) with (⊕-inj eqp-p-qr)
+... | refl , refl = conv-l (conv-l cond q refl) r refl
 
--- conv-plus-idem' : ∀  {A} {v : A} {p : ND A} → p ⇓ v → p ⊕ p ⇓ v
--- conv-plus-idem' c = conv-l c _
+conv-plus-assoc' (conv-r p (conv-ret _) eq-p-qr) with f-inj (impure-inj eq-p-qr) false
+... | ()
+-- q converges to v
+conv-plus-assoc' (conv-r p (conv-l cond q eq-qr) eq-p-qr) with (⊕-inj eq-p-qr)
+... | refl , refl with (⊕-inj eq-qr)
+... | refl , refl = conv-l (conv-r _ cond refl) _ refl
+
+-- r converges to v
+conv-plus-assoc' (conv-r p (conv-r r cond eq-qr) eq-p-qr) with (⊕-inj eq-p-qr)
+... | refl , refl with (⊕-inj eq-qr)
+... | refl , refl = conv-r _ cond refl
+
+
+conv-plus-idem : ∀  {A} {v : A} {p : ND A} → p ⊕ p ⇓ v → p ⇓ v
+conv-plus-idem (conv-l c _ eq-pp) with (⊕-inj eq-pp)
+... | refl , refl = c
+conv-plus-idem (conv-r _ c eq-qq) with (⊕-inj eq-qq)
+... | refl , refl = c
+
+conv-plus-idem' : ∀  {A} {v : A} {p : ND A} → p ⇓ v → p ⊕ p ⇓ v
+conv-plus-idem' c = conv-l c _ refl
 
 
 
--- conv-plus-comm : ∀  {A} {v : A} {p q : ND A} → p ⊕ q ⇓ v → q ⊕ p ⇓ v
--- conv-plus-comm (conv-l c _) = conv-r _ c
--- conv-plus-comm (conv-r _ c) = conv-l c _
+conv-plus-comm : ∀  {A} {v : A} {p q : ND A} → p ⊕ q ⇓ v → q ⊕ p ⇓ v
+conv-plus-comm (conv-l c _ eq-pp) with (⊕-inj eq-pp)
+... | refl , refl = conv-r _ c refl
+conv-plus-comm (conv-r _ c eq-qq) with (⊕-inj eq-qq)
+... | refl , refl = conv-l c _ refl
 
 
 -- --------------------------
 -- -- non-determinism laws --
 -- --------------------------
 
--- plus-unit-l : ∀  {A} {p : ND A} → zero ⊕ p ~ p
--- plus-unit-l = mk~ conv-plus-unit-l ( λ c → conv-r _ c)
+plus-unit-l : ∀  {A} {p : ND A} → zero ⊕ p ~ p
+plus-unit-l = mk~ conv-plus-unit-l ( λ c → conv-r _ c refl)
 
 
--- plus-unit-r : ∀  {A} {p : ND A} → p ⊕ zero ~ p
--- plus-unit-r = mk~ conv-plus-unit-r ( λ c → conv-l c _)
+plus-unit-r : ∀  {A} {p : ND A} → p ⊕ zero ~ p
+plus-unit-r = mk~ conv-plus-unit-r ( λ c → conv-l c _ refl)
 
 
--- plus-assoc : ∀  {A} {p q r : ND A} → (p ⊕ q) ⊕ r ~ p ⊕ (q ⊕ r)
--- plus-assoc = mk~ conv-plus-assoc conv-plus-assoc'
+plus-assoc : ∀  {A} {p q r : ND A} → (p ⊕ q) ⊕ r ~ p ⊕ (q ⊕ r)
+plus-assoc = mk~ conv-plus-assoc conv-plus-assoc'
 
 
--- plus-idem : ∀  {A} (p : ND A) → p ⊕ p ~ p
--- plus-idem p = mk~ conv-plus-idem conv-plus-idem'
+plus-idem : ∀  {A} (p : ND A) → p ⊕ p ~ p
+plus-idem p = mk~ conv-plus-idem conv-plus-idem'
 
 
--- plus-comm : ∀  {A} {p q : ND A} → p ⊕ q ~ q ⊕ p
--- plus-comm = mk~ conv-plus-comm conv-plus-comm
+plus-comm : ∀  {A} {p q : ND A} → p ⊕ q ~ q ⊕ p
+plus-comm = mk~ conv-plus-comm conv-plus-comm
 
+plus-distr : ∀  {A B} {p q : ND A} {f : A → ND B}  → ((p ⊕ q) >>= f) ~ (p >>= f) ⊕ (q >>= f)
+plus-distr = ~choice-op-cong ~refl ~refl
 
--- plus-distr : ∀  {A B} {p q : ND A} {f : A → ND B}  → ((p ⊕ q) >>= f) ~ (p >>= f) ⊕ (q >>= f)
--- plus-distr = ~refl
+zero-bind : ∀  {A B} {f : A → ND B} → (zero >>= f) ~ zero
+zero-bind = ~zero-refl
 
--- zero-bind : ∀  {A B} {f : A → ND B} → (zero >>= f) ~ zero
--- zero-bind = ~refl
-
--- plus-distr-dup : ∀  {A B} {p : ND A} {q : ND B} {f : A → ND B}
---   → (p >>= f) ⊕ q ~ (p >>= λ x → f x ⊕ q) ⊕ q
--- plus-distr-dup  {p = ret x} {q} {f} =
---   f x ⊕ q
---   ~⟨ plus-cong-r (~symm (plus-idem q)) ⟩
---   f x ⊕ (q ⊕ q)
---   ~⟨  ~symm plus-assoc ⟩
---   f x ⊕ q ⊕ q
---   ∎
--- plus-distr-dup {p = zero} =  ~refl
--- plus-distr-dup {p = p1 ⊕ p2} {q} {f} = 
---   (p1 >>= f) ⊕ (p2 >>= f) ⊕ q
---   ~⟨ plus-assoc ⟩
---   (p1 >>= f) ⊕ ((p2 >>= f) ⊕ q)
---   ~⟨ plus-cong-r  (plus-distr-dup {p = p2}) ⟩
---   (p1 >>= f) ⊕ ((p2 >>= (λ x → f x ⊕ q)) ⊕ q)
---   ~⟨  plus-cong-r plus-comm ⟩
---   (p1 >>= f) ⊕ (q ⊕ (p2 >>= (λ x → f x ⊕ q)))
---   ~⟨  ~symm plus-assoc ⟩
---   (p1 >>= f) ⊕ q ⊕ (p2 >>= (λ x → f x ⊕ q))
---   ~⟨ plus-cong-l (plus-distr-dup {p = p1}) ⟩
---   ((p1 >>= (λ x → f x ⊕ q)) ⊕ q) ⊕ (p2 >>= (λ x → f x ⊕ q))
---   ~⟨ plus-cong-l plus-comm ⟩
---   (q ⊕ (p1 >>= (λ x → f x ⊕ q))) ⊕ (p2 >>= (λ x → f x ⊕ q))
---   ~⟨ plus-assoc ⟩
---   q ⊕ ((p1 >>= (λ x → f x ⊕ q)) ⊕ (p2 >>= (λ x → f x ⊕ q)))
---   ~⟨  plus-comm ⟩
---   (p1 >>= (λ x → f x ⊕ q)) ⊕ (p2 >>= (λ x → f x ⊕ q)) ⊕ q
---   ∎
+plus-distr-dup : ∀  {A B} {p : ND A} {q : ND B} {f : A → ND B}
+  → (p >>= f) ⊕ q ~ (p >>= λ x → f x ⊕ q) ⊕ q
+plus-distr-dup  {p = pure x} {q} {f} =
+  f x ⊕ q
+  ~⟨ plus-cong-r (~symm (plus-idem q)) ⟩
+  f x ⊕ (q ⊕ q)
+  ~⟨  ~symm plus-assoc ⟩
+  f x ⊕ q ⊕ q
+  ∎
+plus-distr-dup {p = impure (ZeroOp , cont)} = ~choice-op-cong ~zero-refl ~refl
+plus-distr-dup {p = impure (ChoiceOp , cont)} {q} {f} with plus-extraction {cont = cont}
+... | p1 , p2 , refl = ((p1 ⊕ p2) >>= f) ⊕ q
+  ~⟨ plus-cong-l (~distr-plus-bind) ⟩
+  ((p1 >>= f) ⊕ (p2 >>= f)) ⊕ q
+  ~⟨ plus-assoc ⟩
+  (p1 >>= f) ⊕ ((p2 >>= f) ⊕ q)
+  ~⟨ plus-cong-r (plus-distr-dup {p = p2}) ⟩
+  (p1 >>= f) ⊕ ((p2 >>= (λ x → f x ⊕ q)) ⊕ q)
+  ~⟨  plus-cong-r plus-comm ⟩
+  (p1 >>= f) ⊕ (q ⊕ (p2 >>= (λ x → f x ⊕ q)))
+  ~⟨  ~symm plus-assoc ⟩
+  (p1 >>= f) ⊕ q ⊕ (p2 >>= (λ x → f x ⊕ q))
+  ~⟨ plus-cong-l (plus-distr-dup {p = p1}) ⟩
+  ((p1 >>= (λ x → f x ⊕ q)) ⊕ q) ⊕ (p2 >>= (λ x → f x ⊕ q))
+  ~⟨ plus-cong-l plus-comm ⟩
+  (q ⊕ (p1 >>= (λ x → f x ⊕ q))) ⊕ (p2 >>= (λ x → f x ⊕ q))
+  ~⟨ plus-assoc ⟩
+  q ⊕ ((p1 >>= (λ x → f x ⊕ q)) ⊕ (p2 >>= (λ x → f x ⊕ q)))
+  ~⟨  plus-comm ⟩
+  (p1 >>= (λ x → f x ⊕ q)) ⊕ (p2 >>= (λ x → f x ⊕ q)) ⊕ q
+  ~⟨ plus-cong-l (~distr-plus-bind') ⟩
+   ((p1 ⊕ p2) >>= λ x → f x ⊕ q) ⊕ q
+  ∎
 
 -- interchange : ∀  {A B} {p : ND A} {q : ND B} {f : A → ND B} → (∃[ v ] p ⇓ v)
 --   → (p >>= f) ⊕ q ~ (p >>= λ x → f x ⊕ q)
@@ -493,4 +594,4 @@ bind-assoc (impure (ChoiceOp , snd)) = {!   !}
 -- pos-getJust : ∀ {A B} (p : ND B) {f : A → ND B} (m : Maybe A) → ∃[ v ] p ⇓ v → (∀ w → ∃[ v ] f w ⇓ v) → ∃[ v ] (getJust p f m) ⇓ v
 -- pos-getJust p nothing c f = c
 -- pos-getJust p (just x) c f = f x
-             
+ 

@@ -44,7 +44,7 @@ zero = impure (ZeroOp , λ ())
 -- zero-is-impure-zero x c with f-inj (impure-inj x)
 -- ... | xx = ?
 
-infix 8 _⊕_
+infixl 8 _⊕_
 
 _⊕_ : ∀ {A} → NDFree A → NDFree A → NDFree A
 op₁ ⊕ op₂ = impure (ChoiceOp , λ b → if b then op₁ else op₂)
@@ -64,4 +64,3 @@ op₁ ⊕ op₂ = impure (ChoiceOp , λ b → if b then op₁ else op₂)
       → p ⊕ q ≡ p′ ⊕ q′ → (p ≡ p′) × (q ≡ q′)
 ⊕-inj x with f-inj (impure-inj x)
 ... | q = (q true) , (q false)
- 
