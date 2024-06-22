@@ -19,18 +19,6 @@ infix 6 _~_
 infix 7 _∎
 infix 5 _⇓_
 
--- convergence rules for ND
--- data _⇓_ {A : Set} (nd : ND A) (x : A) : Set where
---   -- ret x converges to x
---   -- Args: a proof that nd ≡ ret x 
---   conv-ret : nd ≡ ret x → nd ⇓ x
---   -- p ⊕ q converges to v if p converges to v
---   -- Args: proof p converges to x, q: ND A, proof that nd = p ⊕ q
---   conv-l : ∀ {p} → p ⇓ x → (q : ND A) → nd ≡ (p ⊕ q) → nd ⇓ x
---   -- p ⊕ q converges to v if q converges to v
---   -- Args: p: ND A, proof q converges to x, proof of that nd = p ⊕ q
---   conv-r : ∀ {q} → (p : ND A) → q ⇓ x → nd ≡ (p ⊕ q) → nd ⇓ x
-
 data _⇓_ {A : Set} : ND A → A → Set where
   -- ret x converges to x
   -- Args: a proof that nd ≡ ret x 
@@ -41,11 +29,6 @@ data _⇓_ {A : Set} : ND A → A → Set where
   -- p ⊕ q converges to v if q converges to v
   -- Args: p: ND A, proof q converges to x, proof of that nd = p ⊕ q
   conv-r : ∀{q} {x} {nd} → (p : ND A) → q ⇓ x → nd ≡ p ⊕ q → nd ⇓ x
-
--- data _⇓_ {A : Set} : ND A → A → Set where
---   conv-ret : (x : A) → ret x ⇓ x
---   conv-l : ∀{p} {x} → p ⇓ x → (q : ND A) → p ⊕ q ⇓ x
---   conv-r : ∀{q} {x} → (p : ND A) → q ⇓ x → p ⊕ q ⇓ x
 
 -- p and q are bisimilar if they converge to the same value for all possible values
 record _~_  {A : Set} (p q : ND A) : Set where
@@ -165,38 +148,6 @@ bind-cong-conv {a = impure (ChoiceOp , .(λ b → if b then p else _))} {f = f} 
       -- show that (a >>= f) ≡ (p >>= f) ⊕ (q >>= f)
       (distr-plus-bind)
 
-{-
-bind-cong-conv : ∀ {A B} {a : ND A} {f : A → ND B} {v : A} {w : B}
- → (a ⇓ v) → f v ⇓ w → (a >>= f) ⇓ w
-
--- Given a is pure (x: A), the case that a converges to v, and f v converges to w
-bind-cong-conv {a = pure x} (conv-ret refl) d = d
-
--- bind-cong-conv {a = pure x} (conv-ret r) d = subst r {!   !}
-
-bind-cong-conv (conv-l c q x) d with impure-inj x
-... | x = ?
--- bind-cong-conv (conv-l c q refl) d = conv-l x1 x2 refl where
---   x1 = ?
---   x2 = ?
-bind-cong-conv (conv-r p c refl) d = {!   !}
--- bind-cong-conv {a = pure x} (conv-ret refl) d = {!   !}
--- bind-cong-conv {a = impure (ChoiceOp , k)} d = {!   !}
--- bind-cong-conv {a = impure (ChoiceOp , k)} (conv-l c _ x₁) d with f-inj (impure-inj x₁)
--- ... | ff = {!   !}
--- bind-cong-conv {a = impure (ChoiceOp , k)} (conv-l c vx x₁) d with ⊕-inj x₁
--- ... | (r1 , r2) = ?
--- bind-cong-conv {a = impure (ChoiceOp , k)} (conv-r _ c x₁) d = {!   !}
--- Original:
--- https://agda.readthedocs.io/en/v2.6.1/language/function-definitions.html#dot-patterns
--- bind-cong-conv {a = a1 ⊕ a2} (conv-l c .a2) d = conv-l (bind-cong-conv c d) _
--- bind-cong-conv {a = a1 ⊕ a2} (conv-r .a1 c) d = conv-r _ (bind-cong-conv c d)
--}
-
--- postulate
---   distr-plus-bind-left' : ∀ {A B} {f : A → ND B} {p q : ND B} {k} →
---     (impure (ChoiceOp , k) >>= f) ≡ (p ⊕ q) → {p' : ND A} → ∃[ p' ] (p' >>= f ≡ p)
-
 Bool-eta : ∀ {A : Set} (f : Bool → A) → f ≡ λ b → if b then f true else f false
 Bool-eta f = funext λ {true → refl ; false → refl }
 
@@ -229,25 +180,6 @@ bind-cong-conv' {a = impure (ChoiceOp , k)} {f = f} (conv-r {q = q} p c x)
     = _
     , conv-r (k true) r' (cong (impure ∘ (ChoiceOp ,_)) (Bool-eta k))
     , t'
-
-{-
--- bind-cong-conv' {a = impure (ChoiceOp , k)} {f = f} (conv-l {p = .(_ >>= f)} c .(_ >>= f) x) = _ , {!   !}
--- bind-cong-conv' {a = impure (ChoiceOp , .(λ x → fold f impure (λ b → if b then (p' >>= f) else ('q >>= f))))} {f = f} (conv-l {p = p} c q x) = _ , {!   !}
--- bind-cong-conv' {a = impure (ChoiceOp , k)} {f = f} (conv-l {p = p} c q x) = ?
--- bind-cong-conv' {a = pure x} c = x , ((conv-ret refl) , c)
-
--- bind-cong-conv' {a = impure (ChoiceOp , .(λ _ → if _ then _ else _))} (conv-l c .(_ >>= _) refl) with bind-cong-conv' {a = _} c
--- ... | v' , d1 , d2 =  v' , {!   !} , d2
--- bind-cong-conv' {a = impure (ChoiceOp , .(λ _ → if _ then _ else _))} (conv-r .(_ >>= _) c refl) with bind-cong-conv' {a = _} c
--- ... | v' , d1 , d2 =  v' , conv-r _ _ _ , d2
-
--- Original:
--- bind-cong-conv' {a = ret x} c = x , (conv-ret x , c)
--- bind-cong-conv' {a = a1 ⊕ a2} (conv-l c .(a2 Bind.>>= _)) with bind-cong-conv' {a = a1} c
--- ... | v' , d1 , d2 = v' , conv-l d1 a2 , d2
--- bind-cong-conv' {a = a1 ⊕ a2} (conv-r .(a1 Bind.>>= _) c) with bind-cong-conv' {a = a2} c
--- ... | v' , d1 , d2 = v' , conv-r a1 d1 , d2
--}
 
 bind-cong : ∀ {A B}  {a b : ND A} (eq : a ~ b)
             {k l : A → ND B} (h : ∀ a → (k a) ~ (l a)) →
@@ -609,4 +541,3 @@ pos-bind p (v , c) f with f v
 pos-getJust : ∀ {A B} (p : ND B) {f : A → ND B} (m : Maybe A) → ∃[ v ] p ⇓ v → (∀ w → ∃[ v ] f w ⇓ v) → ∃[ v ] (getJust p f m) ⇓ v
 pos-getJust p nothing c f = c
 pos-getJust p (just x) c f = f x
-  
