@@ -11,6 +11,16 @@ open import FreeND
 open import Effect
 open import Level using (Level)
 
+-- Include functional extensionality
+private
+  variable
+    level : Level
+
+postulate
+  -- functional extensionality: if equal inputs produce equal outputs then the functions are equal
+  funext : Extensionality level level
+
+-- Define the non-determinism monad as a free monad over the choice effect
 ND = NDFree
 
 infixr 6 _~⟨_⟩_
@@ -19,6 +29,7 @@ infix 6 _~_
 infix 7 _∎
 infix 5 _⇓_
 
+-- Convergence rules
 data _⇓_ {A : Set} : ND A → A → Set where
   -- ret x converges to x
   -- Args: a proof that nd ≡ ret x 
@@ -91,19 +102,14 @@ _~⟨⟩_  x eq = eq
 _∎ : ∀ {A : Set} (x : ND A) → x ~ x
 _∎  x = ~refl
 
+-- fold over an if statements distributes the if over the folds
+fold-if-distr : ∀ {A B : Set} {E : Effect} (f : A → B) (g : Alg E B) b x y
+              → (fold f g (if b then x else y))
+                ≡ (if b then (fold f g x) else (fold f g y))
 
-private
-  variable
-    ℓ0 : Level
+fold-if-distr f g false x y = refl
+fold-if-distr f g true x y = refl
 
-postulate
-  -- fold over an if statements distributes the if over the folds
-  fold-if-distr : ∀ {A B : Set} {E : Effect} (f : A → B) (g : Alg E B) b x y
-                → (fold f g (if b then x else y))
-                  ≡ (if b then (fold f g x) else (fold f g y))
-
-  -- functional extensionality: if equal inputs produce equal outputs then the functions are equal
-  funext : Extensionality ℓ0 ℓ0
 
 -- definition of p ⊕ q equals its definition
 distr-plus : ∀ {A} {p q : ND A} →
