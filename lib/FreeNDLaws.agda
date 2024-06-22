@@ -362,7 +362,7 @@ zero-bind : ∀  {A B} {f : A → ND B} → (zero >>= f) ~ zero
 zero-bind = ~zero-refl
 
 -- TODO: Without needing terminating
-{-# TERMINATING #-}
+-- {-# TERMINATING #-}
 plus-distr-dup : ∀  {A B} {p : ND A} {q : ND B} {f : A → ND B}
   → (p >>= f) ⊕ q ~ (p >>= λ x → f x ⊕ q) ⊕ q
 plus-distr-dup  {p = pure x} {q} {f} =
@@ -399,7 +399,7 @@ plus-distr-dup {p = impure (ChoiceOp , cont)} {q} {f} with plus-extraction {cont
   ∎
 
 -- TODO: Without needing terminating
-{-# TERMINATING #-}
+-- {-# TERMINATING #-}
 interchange : ∀  {A B} {p : ND A} {q : ND B} {f : A → ND B} → (∃[ v ] p ⇓ v)
   → (p >>= f) ⊕ q ~ (p >>= λ x → f x ⊕ q)
 interchange {p = pure x} _ =  ~refl
