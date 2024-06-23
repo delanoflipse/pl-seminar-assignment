@@ -1,5 +1,5 @@
 default: 
-	agda Main.agda
+	agda Everything.agda
 
 clean:
 	find . -type f -name '*.agdai' -delete

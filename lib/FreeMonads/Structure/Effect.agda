@@ -4,7 +4,7 @@ open import Function.Base
 open import Data.Product
 open import Data.Sum.Base
 
-module Effect where
+module FreeMonads.Structure.Effect where
 
 infix 5 _▷_
 

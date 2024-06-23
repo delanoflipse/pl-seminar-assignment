@@ -1,13 +1,29 @@
-{-# OPTIONS --type-in-type --unicode --guardedness #-}
-open import Free
-open import FreePartial
+{-# OPTIONS --unicode --guardedness #-}
+module FreeMonads.Theorems.Partial where
+
+open import FreeMonads.Structure.Effect
+open import FreeMonads.Structure.Free
+open import FreeMonads.Partial
 open import Function
-open import Relation.Binary.PropositionalEquality
+open import Axiom.Extensionality.Propositional
+open import Function
+open import Relation.Binary.PropositionalEquality hiding (Extensionality)
 open import Data.Bool
 open import Data.Product
+open import Data.Unit
+open import Data.Nat
+open import Level using (Level)
+
+-- Include functional extensionality
+private
+  variable
+    level : Level
+
+postulate
+  -- functional extensionality: if equal inputs produce equal outputs then the functions are equal
+  funext : Extensionality level level
 
 Partial = PartialFree
-
 
 infix 3 _~_
 -- infix 6 _~[_]_
@@ -22,62 +38,93 @@ infix 3 _~_
 
 data _~_ {A : Set} : (a? b? : Partial A) → Set where
   ~now   : ∀ a → now a ~ now a
-  ~later : ∀ {a b} → later a ~ later b
+  ~later : ∀ {a b later-a later-b} (eq : a ~ b) → (later-a ≡ later a) → (later-b ≡ later b) → later-a ~ later-b
 
 
+Unit-eta : ∀ {A : Set} (f : ⊤ → A) → f ≡ λ _ → f tt
+Unit-eta f = funext λ {tt → refl }
+
+Unit-eta' : ∀ {A : Set} {f g : ⊤ → A} → f ≡ g → f tt ≡ g tt
+Unit-eta' {f = f} {g = g} refl = refl
+
+later-extraction : ∀ {A} (cont : Effect.Ret PartialEffect LaterOp → Free PartialEffect A)
+  → ∃ λ a → later a ≡ impure (LaterOp , cont)
+later-extraction cont = (cont tt , (impure-inj' (sym (Unit-eta cont))))
+
+later-inj : ∀ {A} {a b : Partial A} → later a ≡ later b → a ≡ b
+later-inj {a = a} {b = b} eq with impure-inj eq
+... | r with (Unit-eta' r)
+... | refl = refl
+
+~later-op : ∀ {A} {a b : Partial A}
+  → later a ~ b
+  → ∃ λ b' → b ≡ later b'
+~later-op (~later {b = b'} {later-b = b} conv-ab eq-a eq-b ) with later-inj eq-a
+... | refl = b' , eq-b
 
 -- Reflexivity
 
+-- TODO: Determine if terminating
+{-# TERMINATING #-}
 ~refl  : ∀ {A} (a? : Partial A) → _~_ a? a?
 ~refl (pure a) = ~now a
-~refl (impure (LaterOp , k)) = {!   !}
--- ~refl (impure (LaterOp , k)) = ~later (~refl k)
+~refl (impure (LaterOp , k)) with later-extraction k
+... | a , refl = ~later (~refl a) refl refl
+-- ... | a , refl = ~later (~refl a)
 
-{-
+
 -- Transitivity
 
-mutual
-  ~trans : ∀ {i A} {a b c : Partial A}
-    (eq : _~_ {i} a b) (eq' : _~_ {i} b c) → _~_ {i} a c
-  ~trans (~now a)    (~now .a)    = ~now a
-  ~trans (~later eq) (~later eq') = ~later (∞~trans eq eq')
+-- mutual
+--   ~trans : ∀ {i A} {a b c : Partial A}
+--     (eq : _~_ {i} a b) (eq' : _~_ {i} b c) → _~_ {i} a c
+--   ~trans (~now a)    (~now .a)    = ~now a
+--   ~trans (~later eq) (~later eq') = ~later (∞~trans eq eq')
 
-  ∞~trans : ∀ {i A} {a∞ b∞ c∞ : ∞Partial A}
-    (eq : _∞~_ {i} a∞ b∞) (eq' : _∞~_ {i} b∞ c∞) → _∞~_ {i} a∞ c∞
-  ~force (∞~trans eq eq') = ~trans (~force eq) (~force eq')
+--   ∞~trans : ∀ {i A} {a∞ b∞ c∞ : ∞Partial A}
+--     (eq : _∞~_ {i} a∞ b∞) (eq' : _∞~_ {i} b∞ c∞) → _∞~_ {i} a∞ c∞
+--   ~force (∞~trans eq eq') = ~trans (~force eq) (~force eq')
+
+~trans : ∀ {A} {a b c : Partial A}
+  (eq : a ~ b) (eq' : b ~ c) → a ~ c
+~trans (~now a) (~now .a) = ~now a
+~trans (~later eq1 refl refl) (~later eq2 rlb refl) with later-inj rlb
+... | refl = ~later (~trans eq1 eq2) refl refl
 
 -- indexed bisimilarity
 
-mutual
-  data _~[_]_ {A : Set} : (a : Partial A) → (i : ℕ) → (b : Partial A) → Set where
-    ~izero   : ∀ {a b} → a ~[ 0 ] b
-    ~inow   : ∀ i a → now a ~[ i ] now a
-    ~ilater : ∀ {i a b} (eq : force a ~[ i ] force b) → later a ~[ suc i ] later b
+data _~[_]_ {A : Set} : (a : Partial A) → (i : ℕ) → (b : Partial A) → Set where
+  ~izero   : ∀ {a b} → a ~[ 0 ] b
+  ~inow   : ∀ i a → now a ~[ i ] now a
+  ~ilater : ∀ {i a b la lb} (eq : a ~[ i ] b) → (la ≡ later a) → (lb ≡ later b) → la ~[ suc i ] lb
 
 -- indexed bisimilarity implies bisimilairity
 
-mutual
-  stepped : ∀ {A} {j} (a b : Partial A) → (∀ i → a ~[ i ] b) → _~_ {j} a b
-  stepped (now x) (now y) eq with eq 1
-  ... | ~inow _ _  =  ~now x
-  stepped (now x) (later y) eq with eq 1
-  ... | ()
-  stepped (later x) (now y) eq with eq 1
-  ... | ()
-  stepped (later x) (later y) eq =  ~later (∞stepped x y (\ i -> stepped-later i x y (eq (suc i))))
-    where stepped-later : ∀ {A} i (a b : ∞Partial A) →
-                         (later a  ~[ suc i ] later b) →  force a ~[ i ] force b
-          stepped-later i a b (~ilater eq) =  eq
-  ∞stepped : ∀ {A} {i} (a b : ∞Partial A) → (∀ i → force a ~[ i ] force b) →  _∞~_ {i} a b
-  ~force (∞stepped a b eq) =  stepped (force a) (force b)  eq
+
+-- TODO: Determine if terminating
+{-# TERMINATING #-}
+stepped : ∀ {A} (a b : Partial A) → (∀ i → a ~[ i ] b) → _~_ a b
+stepped (pure x) (pure y) eq with eq 1
+... | ~inow _ _  =  ~now x
+stepped (pure x) (impure (LaterOp , cont)) eq with eq 1
+... | ~ilater e () rb
+stepped (impure x) (pure y) eq with eq 1
+... | ~ilater e ra ()
+stepped (impure (LaterOp , contx)) (impure (LaterOp , conty)) eq with later-extraction contx | later-extraction conty
+... | x , refl | y , refl = ~later (stepped x y (λ i -> stepped-later i x y (eq (suc i)))) refl refl
+  where stepped-later : ∀ {A} i (a b : Partial A) →
+                        (later a  ~[ suc i ] later b) →  a ~[ i ] b
+        stepped-later i a b (~ilater e r-la r-lb) with later-inj r-la | later-inj r-lb
+        ... | refl | refl = e
+
 
 -- reflexivity
 
-
 ~irefl'  : ∀ {i A} (a : Partial A) → a ~[ i ] a
 ~irefl' {zero} a =  ~izero
-~irefl' {suc i} (now x) = ~inow (suc i) x
-~irefl' {suc i} (later x) =  ~ilater (~irefl' ( force x)) 
+~irefl' {suc i} (pure x) = ~inow (suc i) x
+~irefl' {suc i} (impure (LaterOp , cont)) with later-extraction cont
+... | x , refl = ~ilater (~irefl' x) refl refl
 
 ~irefl  : ∀ {i A} {a : Partial A} → a ~[ i ] a
 ~irefl {_} {_} {a} =  ~irefl' a
@@ -90,7 +137,9 @@ mutual
   (eq : a ~[ i ] b) (eq' : b ~[ i ] c) → a ~[ i ] c
 ~itrans {zero} eq eq' = ~izero
 ~itrans {suc i} (~inow .(suc i) a) (~inow .(suc i) .a) = ~inow (suc i) a
-~itrans {suc i} (~ilater eq) (~ilater eq') =  ~ilater (~itrans {i} eq eq')
+~itrans {suc i} (~ilater eq refl refl) (~ilater eq' r1 refl) with later-inj r1
+... | refl = ~ilater (~itrans eq eq') refl refl
+
 
 -- Symmetry
 
@@ -99,12 +148,12 @@ mutual
   (eq : a ~[ i ] b) → b ~[ i ] a
 ~isymm {zero} eq  = ~izero
 ~isymm (~inow i a) =  ~inow i a
-~isymm {suc i} (~ilater eq) = ~ilater (~isymm eq)
-
+~isymm {suc i} (~ilater eq refl refl) = ~ilater (~isymm eq) refl refl
 
 
 _~⟨_⟩_ : ∀ {A : Set} {i} (x : Partial A) → ∀ {y : Partial A} {z : Partial A} → x ~[ i ] y → y ~[ i ] z → x ~[ i ] z
 _~⟨_⟩_ {_} x r eq =  ~itrans r eq
+
 
 _~⟨⟩_ : ∀ {A : Set} {i} (x : Partial A) → ∀ {y : Partial A} → x ~[ i ] y → x ~[ i ] y
 _~⟨⟩_  x eq = eq
@@ -120,62 +169,73 @@ infixr 1 _~⟨⟩_
 
 ~idown : ∀ {i} {A} {a b : Partial A} -> a ~[ suc i ] b -> a ~[ i ] b
 ~idown {i} (~inow .(suc _) a) = ~inow i a
-~idown {zero} (~ilater eq) = ~izero
-~idown {suc i} (~ilater eq) =  ~ilater ( ~idown eq)
+~idown {zero} (~ilater eq refl refl) = ~izero
+~idown {suc i} (~ilater eq refl refl) = ~ilater ( ~idown eq) refl refl
+
 
 bind-cong : ∀ {i A B}  {a b : Partial A} (eq : a ~[ i ] b)
-            {k l : A → Partial B ∞} (h : ∀ a → (k a) ~[ i ] (l a)) →
+            {k l : A → Partial B} (h : ∀ a → (k a) ~[ i ] (l a)) →
             (a >>= k) ~[ i ] (b >>= l)
 bind-cong (~izero) g = ~izero
 bind-cong (~inow _ a) g =  g a
-bind-cong {suc i} (~ilater h) g =  ~ilater ( bind-cong h \ a' -> ~idown (g a'))
+bind-cong {suc i} (~ilater h refl refl) g =  ~ilater ( bind-cong h \ a' -> ~idown (g a')) refl refl
+
 
 bind-cong-l : ∀ {i A B}  {a b : Partial A} (eq : a ~[ i ] b)
-            {k : A → Partial B ∞} →
+            {k : A → Partial B} →
             (a >>= k) ~[ i ] (b >>= k)
 bind-cong-l (~izero) = ~izero
 bind-cong-l (~inow a _) =  ~irefl
-bind-cong-l (~ilater eq) = ~ilater ( bind-cong-l eq)
+bind-cong-l (~ilater eq refl refl) = ~ilater ( bind-cong-l eq) refl refl
 
 
 bind-cong-r : ∀ {i A B}  (a : Partial A)
-            {k l : A → Partial B ∞} (h : ∀ a → (k a) ~[ i ] (l a)) →
+            {k l : A → Partial B} (h : ∀ a → (k a) ~[ i ] (l a)) →
             (a >>= k) ~[ i ] (a >>= l)
-bind-cong-r (now x) eq =  eq x
-bind-cong-r {zero} (later x) eq =  ~izero
-bind-cong-r {suc i} (later x) eq = ~ilater (bind-cong-r (force x) \ a' -> ~idown (eq a') )
+bind-cong-r (pure x) eq = eq x
+bind-cong-r {zero} (impure (LaterOp , cont)) eq with later-extraction cont
+... | x , refl =  ~izero
+bind-cong-r {suc i} (impure (LaterOp , cont)) eq with later-extraction cont
+... | x , refl = ~ilater (bind-cong-r x \ a' -> ~idown (eq a') ) refl refl
+
 
 bind-assoc : ∀{i A B C}(m : Partial A)
-                 {k : A → Partial B ∞}{l : B → Partial C ∞} →
+                 {k : A → Partial B}{l : B → Partial C} →
                  ((m >>= k) >>= l) ~[ i ] (m >>= λ a → k a >>= l)
-bind-assoc (now x) =  ~irefl
-bind-assoc {zero} (later x) =  ~izero
-bind-assoc {suc i} (later x) =  ~ilater ( bind-assoc (force x))
+bind-assoc (pure x) =  ~irefl
+bind-assoc {zero} (impure (LaterOp , cont)) with later-extraction cont
+... | x , refl = ~izero
+bind-assoc {suc i} (impure (LaterOp , cont)) with later-extraction cont
+... | x , refl = ~ilater ( bind-assoc (x)) refl refl
 
 
-mutual
-  never : ∀ {a i} -> Partial a i
-  never = later ∞never
+-- original definition:
+-- mutual
+--   never : ∀ {a i} -> Partial a i
+--   never = later ∞never
 
-  ∞never : ∀ {a i} -> ∞Partial a i
-  force ∞never = never
+--   ∞never : ∀ {a i} -> ∞Partial a i
+--   force ∞never = never
 
+-- TODO: Find a way to express this correctly
+-- Because this is definetively not terminating 😅
+-- never : ∀ {a} -> Partial a
+-- never = impure (LaterOp , λ _ -> never)
 
-
-
-if-bind : ∀ {A B n} {x y : Partial A} {f : A → Partial B ∞} b 
+{-
+if-bind : ∀ {A B n} {x y : Partial A} {f : A → Partial B} b 
   → ((if b then x else y) >>= f) ~[ n ] (if b then (x >>= f) else (y >>= f))
 if-bind false =  ~irefl
 if-bind true = ~irefl
+
 
 if-then-cong : ∀ b {A n} {x y x' : Partial A} (eq : x ~[ n ] x') → (if b then x else y) ~[ n ] (if b then x' else y)
 if-then-cong false eq = ~irefl
 if-then-cong true eq =  eq
 
-
-never-bind : ∀ {i A B} {f : A → Partial B ∞} → (never >>= f) ~[ i ] never
+never-bind : ∀ {i A B} {f : A → Partial B} → (never >>= f) ~[ i ] never
 never-bind {0} = ~izero
-never-bind {suc i} =  ~ilater never-bind
+never-bind {suc i} =  ~ilater never-bind refl refl
 
 bind-never : ∀ {i A B} (m : Partial A) → _~[_]_ {B} (m >>= (λ x → never)) i never
 bind-never {zero} m = ~izero
@@ -321,4 +381,4 @@ equiv-idiv~ {A} {i} {p} {q} =  mk⇔  to
   where to : p ~[ i ] q → ({j : ℕ} {v : A} → j < i → p ⇓[ j ] v → q ⇓[ j ] v)
                         × ({j : ℕ} → j ≤ i → p ⇑[ j ] → q ⇑[ j ])
         to eq =  ( λ le c → ~iconv le eq c) ,  λ le d → ~idiv le eq d
--}   
+-}     

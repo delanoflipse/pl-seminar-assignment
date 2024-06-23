@@ -1,3 +1,6 @@
+-- Note: this file contains some exercises from the book https://plfa.github.io/
+-- To help me get started in Agda
+
 {-# OPTIONS --guardedness  #-}
 open import Agda.Builtin.Nat
 import Relation.Binary.PropositionalEquality as Eq

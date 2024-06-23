@@ -9,9 +9,9 @@ open import Category.Monad
 open import Function.Base
 open import Relation.Binary.PropositionalEquality
 
-open import Effect
+open import FreeMonads.Structure.Effect
 
-module Free where
+module FreeMonads.Structure.Free where
 
 data Free (E : Effect) (A : Set) : Set where
   pure : A → Free E A

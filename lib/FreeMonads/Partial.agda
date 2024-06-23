@@ -4,11 +4,11 @@ open import Data.Nat
 open import Data.Product
 open import Agda.Builtin.Unit
 
-open import Effect
-open import Free
--- open import FreeCo
+open import FreeMonads.Structure.Effect
+open import FreeMonads.Structure.Free
+-- open import FreeMonads.Structure.FreeCo
 
-module FreePartial where
+module FreeMonads.Partial where
 -- data Partial (A : Set) : Set where
 --   Now : A → Partial A
 --   Later : Partial A -> Partial A

@@ -1,4 +1,4 @@
-module Languages.FreeInterupts where
+module Languages.Interrupts where
 
 ------------------------------------------------------------------------
 -- Calculation for the interrupts language. Instead of the abridged
@@ -7,9 +7,9 @@ module Languages.FreeInterupts where
 ------------------------------------------------------------------------
 
 
-open import FreeNDLaws public
-open import FreeND public
-open import Free
+open import FreeMonads.Theorems.NonDeterminism public
+open import FreeMonads.NonDeterminism public
+open import FreeMonads.Structure.Free
 open import Data.Nat
 open import Data.Maybe hiding (_>>=_)
 open import Data.Product 
@@ -41,7 +41,7 @@ data Status : Set where
 
 interrupt : Status → ND Value
 interrupt U = return nothing
-interrupt B = FreeND.zero
+interrupt B = FreeMonads.NonDeterminism.zero
 
 mutual
   eval : Expr → Status → ND Value
@@ -113,17 +113,17 @@ mutual
   exec (UNMARK c) (VAL n ∷ HAN _ ∷ s , i) = exec c (VAL n ∷ s , i)
   exec (MARK c' c) (s , i) = exec c (HAN c' ∷ s , i) ⊕ inter s i
   exec HALT c = return c
-  exec _ _ = FreeND.zero
+  exec _ _ = FreeMonads.NonDeterminism.zero
 
   fail : Stack → Status → ND Conf
   fail (HAN c ∷ s) i = exec c (s , i)
   fail (VAL m ∷ s) i = fail s i
   fail (STA i ∷ s) _ = fail s i
-  fail _ _ = FreeND.zero
+  fail _ _ = FreeMonads.NonDeterminism.zero
 
   inter : Stack → Status → ND Conf
   inter s U = fail s U
-  inter s B = FreeND.zero
+  inter s B = FreeMonads.NonDeterminism.zero
 
 
 --------------

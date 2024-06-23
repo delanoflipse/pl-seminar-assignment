@@ -1,3 +1,5 @@
+-- Note: Used this file to follow some of the code sample from the file, before switching to agda.
+
 -- A simple language with non-terminating loops
 data Expr = Val Int | Add Expr Expr | Loop
 

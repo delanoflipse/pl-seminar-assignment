@@ -1,3 +1,5 @@
+module FreeMonads.Theorems.NonDeterminism where
+
 open import Axiom.Extensionality.Propositional
 open import Function
 open import Relation.Binary.PropositionalEquality hiding (Extensionality)
@@ -6,9 +8,9 @@ open import Data.Maybe hiding (_>>=_)
 open import Data.Bool
 open import Data.Product
 open import Data.Empty
-open import Free
-open import FreeND
-open import Effect
+open import FreeMonads.Structure.Free
+open import FreeMonads.NonDeterminism
+open import FreeMonads.Structure.Effect
 open import Level using (Level)
 
 -- Include functional extensionality
@@ -362,7 +364,7 @@ zero-bind : ∀  {A B} {f : A → ND B} → (zero >>= f) ~ zero
 zero-bind = ~zero-refl
 
 -- TODO: Without needing terminating
--- {-# TERMINATING #-}
+{-# TERMINATING #-}
 plus-distr-dup : ∀  {A B} {p : ND A} {q : ND B} {f : A → ND B}
   → (p >>= f) ⊕ q ~ (p >>= λ x → f x ⊕ q) ⊕ q
 plus-distr-dup  {p = pure x} {q} {f} =
@@ -399,7 +401,7 @@ plus-distr-dup {p = impure (ChoiceOp , cont)} {q} {f} with plus-extraction {cont
   ∎
 
 -- TODO: Without needing terminating
--- {-# TERMINATING #-}
+{-# TERMINATING #-}
 interchange : ∀  {A B} {p : ND A} {q : ND B} {f : A → ND B} → (∃[ v ] p ⇓ v)
   → (p >>= f) ⊕ q ~ (p >>= λ x → f x ⊕ q)
 interchange {p = pure x} _ =  ~refl

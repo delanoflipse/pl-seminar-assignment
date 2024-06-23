@@ -1,10 +1,11 @@
+-- Hello World in Agda, just to get started
+module HelloWorld where
+
 data Greeting : Set where
   hello : Greeting
 
 greet : Greeting
 greet = hello
-
-module hello-world where
 
 open import Agda.Builtin.IO using (IO)
 open import Agda.Builtin.Unit using (⊤)

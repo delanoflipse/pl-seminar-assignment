@@ -1,3 +1,6 @@
+-- Note: This file is here to play around with monad definition in Agda.
+-- Not used in the final implementation.
+
 open import Agda.Builtin.Equality
 
 -- https://www.cs.bham.ac.uk/~mhe/fp-learning-2017-2018/html/monads.html

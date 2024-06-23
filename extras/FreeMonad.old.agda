@@ -1,3 +1,5 @@
+-- Note: These were earlier attempts at defining free Monads
+-- Not used in the final implementation
 
 -- data Partial (A : Set) : Set where
 --   Now : A → Partial A

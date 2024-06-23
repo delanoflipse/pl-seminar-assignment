@@ -1,3 +1,5 @@
+-- Note: Made this file when first starting to implement the paper
+
 open import Agda.Primitive
 open import Agda.Builtin.Bool
 open import Agda.Builtin.Nat

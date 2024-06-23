@@ -9,15 +9,15 @@ open Eq
 open Eq.≡-Reasoning
 open import Axiom.Extensionality.Propositional
 
-open import Effect
-open import Free
+open import FreeMonads.Structure.Effect
+open import FreeMonads.Structure.Free
 
 -- data ND (A : Set): Set where
 --   ret   : A → ND A
 --   zero  : ND A
 --   _⊕_   : ND A → ND A → ND A
 
-module FreeND where
+module FreeMonads.NonDeterminism where
 
 data NDOp : Set where
   ZeroOp    : NDOp

@@ -1,3 +1,6 @@
+-- Note: initial attempt at implementing the partiality monad
+-- using sized types. This is not the final version
+
 {-# OPTIONS --copatterns --sized-types #-}
 
 open import Size
@@ -6,7 +9,7 @@ open import Data.Bool
 open import Data.Nat
 
 open import Relation.Binary.PropositionalEquality
-open import Effect.Monad
+open import FreeMonads.Structure.FreeMonads.Structure.Effect.Monad
 
 module WithPartial where
   
