@@ -12,6 +12,7 @@ open import Axiom.Extensionality.Propositional
 open import FreeMonads.Structure.Effect
 open import FreeMonads.Structure.Free
 
+-- Original definition of ND:
 -- data ND (A : Set): Set where
 --   ret   : A → ND A
 --   zero  : ND A
