@@ -153,10 +153,15 @@ bind-cong-conv {a = impure (ChoiceOp , .(λ b → if b then p else _))} {f = f} 
 Bool-eta : ∀ {A : Set} (f : Bool → A) → f ≡ λ b → if b then f true else f false
 Bool-eta f = funext λ {true → refl ; false → refl }
 
-plus-extraction :
-  ∀ {A : Set} {cont : Effect.Ret NDEffect ChoiceOp → Free NDEffect A}
+⊕-extraction :
+  ∀ {A : Set} (cont : Effect.Ret NDEffect ChoiceOp → Free NDEffect A)
   → ∃ (λ p → ∃ (λ q → p ⊕ q ≡ impure (ChoiceOp , cont)))
-plus-extraction {cont = cont} = (cont true) , (cont false) , impure-inj' (sym (Bool-eta cont))
+⊕-extraction cont = (cont true) , (cont false) , impure-inj' (sym (Bool-eta cont))
+
+⊕-extraction-full :
+  ∀ {A : Set} (cont : Effect.Ret NDEffect ChoiceOp → Free NDEffect A)
+  → ∃ (λ p → ∃ (λ q → p ⊕ q ≡ impure (ChoiceOp , cont) × p ≡ cont true × q ≡ cont false))
+⊕-extraction-full cont = (cont true) , (cont false) , impure-inj' (sym (Bool-eta cont) ) , refl , refl
 
 -- a >>= f converges to w implies there exists a v such that a converges to v and f v converges to w
 bind-cong-conv' : ∀ {A B} {a : ND A} {f : A → ND B} {w : B} 
@@ -234,7 +239,7 @@ choice-op-equiv-conv {A} {k1} {k2} refl = ~refl
   → (k1 true) ~ (k2 true)
   → (k1 false) ~ (k2 false)
   → impure (ChoiceOp , k1) ~ impure (ChoiceOp , k2)
-~choice-op-cong {A} {k1} {k2} eq1 eq2 with plus-extraction {cont = k1} | plus-extraction {cont = k2}
+~choice-op-cong {A} {k1} {k2} eq1 eq2 with ⊕-extraction k1 | ⊕-extraction k2
 ... | p1 , q1 , refl | p2 , q2 , refl = plus-cong eq1 eq2
 
 -- monad law: bind is associative
@@ -358,8 +363,6 @@ plus-distr = ~choice-op-cong ~refl ~refl
 zero-bind : ∀  {A B} {f : A → ND B} → (zero >>= f) ~ zero
 zero-bind = ~zero-refl
 
--- TODO: Without needing terminating
-{-# TERMINATING #-}
 plus-distr-dup : ∀  {A B} {p : ND A} {q : ND B} {f : A → ND B}
   → (p >>= f) ⊕ q ~ (p >>= λ x → f x ⊕ q) ⊕ q
 plus-distr-dup  {p = pure x} {q} {f} =
@@ -369,10 +372,12 @@ plus-distr-dup  {p = pure x} {q} {f} =
   ~⟨  ~symm plus-assoc ⟩
   f x ⊕ q ⊕ q
   ∎
-
 plus-distr-dup {p = impure (ZeroOp , cont)} = ~choice-op-cong ~zero-refl ~refl
-plus-distr-dup {p = impure (ChoiceOp , cont)} {q} {f} with plus-extraction {cont = cont}
-... | p1 , p2 , refl = ((p1 ⊕ p2) >>= f) ⊕ q
+plus-distr-dup {p = p@(impure (ChoiceOp , cont))} {q} {f} with ⊕-extraction-full cont
+... | p1 , p2 , eq , refl , refl = 
+  (p >>= f) ⊕ q
+  ~⟨ plus-cong-l (bind-cong-l (~eq-refl (sym eq)) f) ⟩
+  ((p1 ⊕ p2) >>= f) ⊕ q
   ~⟨ plus-cong-l (~distr-plus-bind) ⟩
   ((p1 >>= f) ⊕ (p2 >>= f)) ⊕ q
   ~⟨ plus-assoc ⟩
@@ -393,19 +398,22 @@ plus-distr-dup {p = impure (ChoiceOp , cont)} {q} {f} with plus-extraction {cont
   (p1 >>= (λ x → f x ⊕ q)) ⊕ (p2 >>= (λ x → f x ⊕ q)) ⊕ q
   ~⟨ plus-cong-l (~distr-plus-bind') ⟩
    ((p1 ⊕ p2) >>= λ x → f x ⊕ q) ⊕ q
+  ~⟨ plus-cong-l (bind-cong-l (~eq-refl eq) _) ⟩
+   (p >>= λ x → f x ⊕ q) ⊕ q
   ∎
 
--- TODO: Without needing terminating
-{-# TERMINATING #-}
-interchange : ∀  {A B} {p : ND A} {q : ND B} {f : A → ND B} → (∃[ v ] p ⇓ v)
+interchange : ∀  {A B} {p : ND A} {q : ND B} {f : A → ND B}
+  → (∃[ v ] p ⇓ v)
   → (p >>= f) ⊕ q ~ (p >>= λ x → f x ⊕ q)
 interchange {p = pure x} _ =  ~refl
 interchange {p = impure (ZeroOp , cont)} (v , conv-l x q ())
 interchange {p = impure (ZeroOp , cont)} (v , conv-r p x ())
 
-interchange {p = impure (ChoiceOp , cont)} {q} {f} (v , conv-l {p = p1'} cond p2' eq-pq) with plus-extraction {cont = cont}
-... | p1 , p2 , refl with (⊕-inj eq-pq)
+interchange {p = p@(impure (ChoiceOp , cont))} {q} {f} (v , conv-l {p = p1'} cond p2' eq-pq) with ⊕-extraction-full cont
+... | p1 , p2 , eq , refl , refl with (⊕-inj (trans eq eq-pq))
 ... | refl , refl = 
+  (p >>= f) ⊕ q
+  ~⟨ plus-cong-l (bind-cong-l (~eq-refl (sym eq)) f) ⟩
   ((p1 ⊕ p2) >>= f) ⊕ q
   ~⟨ plus-cong-l (~distr-plus-bind) ⟩
   ((p1 >>= f) ⊕ (p2 >>= f) ⊕ q)
@@ -417,14 +425,18 @@ interchange {p = impure (ChoiceOp , cont)} {q} {f} (v , conv-l {p = p1'} cond p2
   ((p1 >>= f) ⊕ (q ⊕ (p2 >>= λ x → f x ⊕ q)))
   ~⟨ ~symm plus-assoc ⟩
   (((p1 >>= f) ⊕ q) ⊕ (p2 >>= λ x → f x ⊕ q))
-  ~⟨  plus-cong-l (interchange (v , cond)) ⟩
+  ~⟨ plus-cong-l (interchange (v , cond)) ⟩
   ((p1 >>= λ x → f x ⊕ q) ⊕ (p2 >>= λ x → f x ⊕ q))
   ~⟨ ~distr-plus-bind' ⟩
   ((p1 ⊕ p2) >>= (λ x → f x ⊕ q))
+  ~⟨ bind-cong-l (~eq-refl eq) _ ⟩
+  ((p) >>= (λ x → f x ⊕ q))
   ∎
-interchange {p = impure (ChoiceOp , cont)} {q} {f} (v , conv-r {q = p2'} p1' cond eq-pq) with plus-extraction {cont = cont}
-... | p1 , p2 , refl with (⊕-inj eq-pq)
+interchange {p = p@(impure (ChoiceOp , cont))} {q} {f} (v , conv-r {q = p2'} p1' cond eq-pq) with ⊕-extraction-full cont
+... | p1 , p2 , eq , refl , refl with (⊕-inj (trans eq eq-pq))
 ... | refl , refl = 
+  (p >>= f) ⊕ q
+  ~⟨ plus-cong-l (bind-cong-l (~eq-refl (sym eq)) f) ⟩
   ((p1 ⊕ p2) >>= f) ⊕ q
   ~⟨ plus-cong-l (~distr-plus-bind) ⟩
   ((p1 >>= f) ⊕ (p2 >>= f) ⊕ q)
@@ -438,12 +450,14 @@ interchange {p = impure (ChoiceOp , cont)} {q} {f} (v , conv-r {q = p2'} p1' con
   ((p2 >>= f) ⊕ (q ⊕ (p1 >>= λ x → f x ⊕ q)))
   ~⟨ ~symm plus-assoc ⟩
   ((p2 >>= f) ⊕ q ⊕ (p1 >>= λ x → f x ⊕ q))
-  ~⟨  plus-cong-l (interchange (v , cond)) ⟩
+  ~⟨ plus-cong-l (interchange (v , cond)) ⟩
   ((p2 >>= λ x → f x ⊕ q) ⊕ (p1 >>= λ x → f x ⊕ q))
   ~⟨ plus-comm ⟩
   ((p1 >>= λ x → f x ⊕ q) ⊕ (p2 >>= λ x → f x ⊕ q))
   ~⟨ ~distr-plus-bind' ⟩
   ((p1 ⊕ p2) >>= (λ x → f x ⊕ q))
+  ~⟨ bind-cong-l (~eq-refl eq) _ ⟩
+  ((p) >>= (λ x → f x ⊕ q))
   ∎
 
 
@@ -547,3 +561,4 @@ pos-bind p (v , c) f with f v
 pos-getJust : ∀ {A B} (p : ND B) {f : A → ND B} (m : Maybe A) → ∃[ v ] p ⇓ v → (∀ w → ∃[ v ] f w ⇓ v) → ∃[ v ] (getJust p f m) ⇓ v
 pos-getJust p nothing c f = c
 pos-getJust p (just x) c f = f x
+ 
