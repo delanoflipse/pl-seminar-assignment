@@ -8,6 +8,9 @@ module FreeMonads.Structure.Effect where
 
 infix 5 _▷_
 
+-- Definition of a container
+-- Note: opted to use Effect instead, because the naming is more intuitive
+
 -- record Container : Set where
 --   constructor _▷_
 --   field
@@ -38,7 +41,6 @@ map-sig f (op , k) = (op , f ∘ k)
 
 
 -- Row insertions --
-
 
 variable Δ Δ′ Δ″ Δ‴ Δ₀ Δ₁ Δ₂ Δ₃ : Effect
 

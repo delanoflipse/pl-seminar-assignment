@@ -17,4 +17,3 @@ FreePND = Free PNDEffect
 examplepnd : FreePND ℕ
 examplepnd = impure ((inj₁ LaterOp), λ x → 
   impure (inj₂ ZeroOp , λ ()))
--- inj₁ (LaterOp , λ x → ?

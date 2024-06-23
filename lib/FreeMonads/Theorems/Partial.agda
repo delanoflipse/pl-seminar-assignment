@@ -32,10 +32,9 @@ infix 3 _~_
 -- (strong) bisimilarity --
 ---------------------------
 
--- We define strong bisimilarity in the style of Danielsson. We prove
+-- Note from the original proof: We define strong bisimilarity in the style of Danielsson. We prove
 -- later that this definition is equivalent to the definition in the
 -- paper (see theorem `equiv-iconv~`).
-
 data _~_ {A : Set} : (a? b? : Partial A) → Set where
   ~now   : ∀ a → now a ~ now a
   ~later : ∀ {a b later-a later-b} (eq : a ~ b) → (later-a ≡ later a) → (later-b ≡ later b) → later-a ~ later-b
@@ -74,17 +73,6 @@ later-inj {a = a} {b = b} eq with impure-inj eq
 
 
 -- Transitivity
-
--- mutual
---   ~trans : ∀ {i A} {a b c : Partial A}
---     (eq : _~_ {i} a b) (eq' : _~_ {i} b c) → _~_ {i} a c
---   ~trans (~now a)    (~now .a)    = ~now a
---   ~trans (~later eq) (~later eq') = ~later (∞~trans eq eq')
-
---   ∞~trans : ∀ {i A} {a∞ b∞ c∞ : ∞Partial A}
---     (eq : _∞~_ {i} a∞ b∞) (eq' : _∞~_ {i} b∞ c∞) → _∞~_ {i} a∞ c∞
---   ~force (∞~trans eq eq') = ~trans (~force eq) (~force eq')
-
 ~trans : ∀ {A} {a b c : Partial A}
   (eq : a ~ b) (eq' : b ~ c) → a ~ c
 ~trans (~now a) (~now .a) = ~now a
@@ -223,6 +211,11 @@ bind-assoc {suc i} (impure (LaterOp , cont)) with later-extraction cont
 -- never = impure (LaterOp , λ _ -> never)
 
 {-
+
+-- 
+-- Starting here the theorems rely on never, which is non-terminating, so the proof checker _will_ get stuck.
+--
+
 if-bind : ∀ {A B n} {x y : Partial A} {f : A → Partial B} b 
   → ((if b then x else y) >>= f) ~[ n ] (if b then (x >>= f) else (y >>= f))
 if-bind false =  ~irefl

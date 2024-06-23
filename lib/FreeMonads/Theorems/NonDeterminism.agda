@@ -78,11 +78,6 @@ conv-cong f g (conv-l c q x₁) with ⊕-inj x₁
 conv-cong f g (conv-r p' c x₁) with ⊕-inj x₁
 ... | (refl , refl) = conv-r _ (g c) refl
 
--- conv-cong : ∀ {A} {v} {p q p' q' : ND A} →
---   (p ⇓ v → p' ⇓ v) → (q ⇓ v → q' ⇓ v) → p ⊕ q ⇓ v → p' ⊕ q' ⇓ v
--- conv-cong f g (conv-l c _) =  conv-l (f c) _
--- conv-cong f g (conv-r _ c) =  conv-r _ (g c)
-
 -- if p ~ p' and q ~ q' then p ⊕ q ~ p' ⊕ q'
 plus-cong : ∀ {A} {p q p' q' : ND A} → p ~ p' → q ~ q' → p ⊕ q ~ p' ⊕ q'
 plus-cong eq eq' = mk~ (conv-cong (~conv-l eq) (~conv-l eq'))
@@ -167,10 +162,9 @@ plus-extraction {cont = cont} = (cont true) , (cont false) , impure-inj' (sym (B
 bind-cong-conv' : ∀ {A B} {a : ND A} {f : A → ND B} {w : B} 
                   → (a >>= f) ⇓ w → ∃[ v ] ((a ⇓ v) × f v ⇓ w)
 
--- case pure xa : (pure xa >> f) converges to w, so xa converges to xa and f v converges to w
+-- case pure xa : (pure xa >>= f) converges to w, so xa converges to xa and f v converges to w
 bind-cong-conv' {a = pure xa} c = xa , conv-ret _ , c
--- case (a >> f) = (p ⊕ q) >> f, where (p << f) converges to w
--- However, we instead get the case (a >> f) = p ⊕ q converges to w, where p converges to w.
+-- case (a >> f) = (p ⊕ q) >> f, where (p >>= f) converges to w
 bind-cong-conv' {a = impure (ChoiceOp , k)} {f = f} (conv-l {p = p} c q x)
   with f-inj (impure-inj x) true
 ...  | refl with bind-cong-conv' {a = k true} {f = f} c
@@ -180,6 +174,7 @@ bind-cong-conv' {a = impure (ChoiceOp , k)} {f = f} (conv-l {p = p} c q x)
                        (k false)
                        (cong (impure ∘ (ChoiceOp ,_)) (Bool-eta k))
                    , t'
+-- case (a >> f) = (p ⊕ q) >> f, where (q >>= f) converges to w
 bind-cong-conv' {a = impure (ChoiceOp , k)} {f = f} (conv-r {q = q} p c x)
   with f-inj (impure-inj x) false
 ...  | refl with bind-cong-conv' {a = k false} {f = f} c
